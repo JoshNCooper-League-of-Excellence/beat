@@ -45,9 +45,11 @@ token_types := str.[
 main :: fn() {
   mut lexer := Lexer::new("test.shela".as_string());
 
-
   while {
-    token := lexer.get_token().unwrap();
+    token := lexer.get_token().expect(fn(error: LexError) {
+      printlnf("error: %\nat: %", (error.message, error.location.to_string()));
+      
+    });
     if token.type == TokenType::Eof then break;
 
     if token.type > 0 && token.type < token_types.length {

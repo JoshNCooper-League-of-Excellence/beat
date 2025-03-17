@@ -1,4 +1,6 @@
 
-fn main(a, b, c) {
-
+fn env/main(a, b, c) {
+  if a == b {
+    print(a);
+  }
 }
