@@ -1,0 +1,124 @@
+Today's plan: make a tiny interpreter for a shell like language.
+basic idea of each command:
+
+# calling commands {
+  input  :: 'cat file.txt'
+  effect :: args: ['cat', 'file.txt']
+
+  this can be used in other more complex statements such as:
+  input  :: `for character in !(cat readme.txt) { !(print character) }`
+}
+
+# setting variables {
+  input  :: 'var:local some_local = 'Some Value''
+  effect :: scope: [{'VAR', 'Some Value'}]
+
+  input  :: 'var:env some_exported_env_var = 'Some Value''
+  effect :: env_vars: [{'VAR', 'Some Value'}]
+
+  'var' with no qualifier will default to local.
+  input  :: 'var x = 'Some Value''
+  effect :: env_vars: [{'VAR', 'Some Value'}]
+}
+
+# reading env variables {
+  input  :: 'cat env:VAR'
+  effect :: args: ['cat', ReadVar('VAR')] // obviously a substitute for backend behavior.
+}
+
+# reading normal variables {
+  input  :: 'cat VAR'
+  effect :: args: ['cat', ReadVar('VAR')] // obviously a substitute for backend behavior.
+}
+
+# for loop {
+  input  :: '
+    for index in 0..100 {
+      continue; break;
+      return;
+    }
+  '
+  effect :: loop 100 times, 0 to 99.
+}
+
+# while loop {
+  input  :: '
+    while ((some condition)) {
+      break
+    }
+  '
+  effect :: loop until broken.
+}
+
+# if statement {
+  input  :: '
+    if true {
+      return 10;
+    } else if false {
+      return 20;
+    } else {
+      return 90;
+    }
+  '
+  effect :: execute code based on conditions.
+}
+
+# function {
+  effect :: create a function. come on! you know what that is.
+  input :: '
+    fn get_zero() {
+      return 0;
+    }
+  '
+
+  ((with parameters))
+  input :: '
+    fn clamp(a, b, v) {
+      if v < a return a;
+      if v > b return b;
+      return v;
+    }
+  '
+}
+
+# structs {
+  input  :: '
+    type Vec = { x, y, z };
+    type VecWithDefaults = { x = 0 , y = 0, z = 0 };
+
+    var:local default = make(Vec);
+    var:local one     = make(X, 1, 1, 1);
+    var:local zero    = make(X, 0, 0, 0);
+
+    one.x = 0;
+    one.y = 0;
+    one.z = 0;
+  '
+}
+
+# arrays {
+  input  :: '
+    var array = [0, 1, 2];
+
+    for value in array {
+      print value;
+    }
+
+    array[0] = 1;
+  '
+}
+
+tokens:
+
+operators/punctuation:
+  +  -  /  *  =  ! , ( ) { } [ ] ; < > <= >= != == .
+
+keywords:
+  if, return, fn, var, var:local, var:env,
+  while, for, in, make,
+
+numbers: [0-9]
+
+identifiers: [_a-z__A-Z_]
+
+strings: \'|\"...\'|\"

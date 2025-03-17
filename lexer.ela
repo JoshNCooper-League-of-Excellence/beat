@@ -1,0 +1,253 @@
+import fmt::{
+  format,
+  printlnf,
+  Format_Options,
+};
+
+import map::Map;
+
+import fs::File;
+
+// line, column, filename,
+alias SourceLocation :: (u32, u32, String);
+
+LexError :: struct {
+  location: SourceLocation,
+  message:  String,
+}
+
+TokenType :: enum {
+  Eof,
+
+  Add,
+  Sub,
+  Div,
+  Mul,
+  Assign,
+  Not,
+  Comma,
+  
+  OpenParen,
+  CloseParen,
+  
+  OpenCurly,
+  CloseCurly,
+
+  OpenBracket,
+  CloseBracket,
+
+  Semi,
+
+  LT,
+  LTE,
+  GT,
+  GTE,
+  EQ,
+  NEQ,
+  Dot,
+
+  Number,
+  String,
+
+  Identifier,
+
+  If,
+  For,
+  In,
+  While,
+  Make,
+  
+  Return,
+  Fn,
+  Var,
+  VarLocal,
+  VarEnv,
+}
+
+Token :: struct {
+  type: TokenType,
+  value: Option!<String>,
+  location: SourceLocation,
+}
+
+Lexer :: struct {
+  input: String,
+  location: SourceLocation,
+  buffer: Token[],
+  position: u32,
+
+  keywords: Map!<str, TokenType>,
+}
+
+impl Lexer {
+  new :: fn(path: String) -> #self {
+    mut list: Token[];
+    list.initialize(8);
+
+    mut keywords: Map!<str, TokenType>;
+
+    keywords.insert("if", TokenType::If);
+    keywords.insert("return", TokenType::Return);
+    keywords.insert("fn", TokenType::Fn);
+    keywords.insert("var", TokenType::Var);
+    keywords.insert("var:local", TokenType::VarLocal);
+    keywords.insert("var:env", TokenType::VarEnv);
+    keywords.insert("while", TokenType::While);
+    keywords.insert("for", TokenType::For);
+    keywords.insert("in", TokenType::In);
+    keywords.insert("make", TokenType::Make);
+
+    return .{
+      buffer: list,
+      input: File::read_all(path.as_str()).unwrap(),
+      location: (0, 0, path),
+      keywords: keywords,
+    };
+  }
+
+  advance :: fn(*mut self, new_line: bool) {
+    if new_line {
+      self.location.0++;
+      self.location.1 = 1;
+    } else {
+      self.location.1++;
+    }
+    self.position++;
+  }
+
+  get_next_char :: fn(*mut self, ch: *mut u8) {
+    self.advance(false);
+    *ch = self.input[self.position];
+  }
+
+  get_token :: fn(*mut self) -> Result!<Token, LexError> {
+    alias Result :: Result!<Token, LexError>;
+    mut token: Token;
+
+    token.type = TokenType::Eof;
+
+    while self.position < self.input.length {
+      mut ch := self.input[self.position];
+
+      if ch == '\n' {
+        self.advance(true);
+        continue;
+      }
+
+      if ch == ' ' || ch == '\t' {
+        self.advance(false);
+        continue;
+      }
+
+      if ch == '_' || isalpha(ch) {
+        start := self.position;
+        while ch == '_' || isalpha(ch) {
+          self.get_next_char(&mut ch);
+        }
+        end := self.position;
+
+        length := end - start;
+
+        token.value = Some(String.{
+          data: strndup(self.input.data + start, length),
+          length: length,
+          capacity: length,
+        });
+
+        token.type = TokenType::Identifier;
+
+        mut value := token.value.unwrap();
+
+        keyword := self.keywords.get(value.as_str());
+
+        // TODO: we can deinit the string here, but we could just avoid allocating it all together.
+        if keyword.is_some() {
+          printlnf("keyword % got %", (token.value.unwrap(), keyword.unwrap()));
+          token.type = keyword.unwrap();
+          value.deinit();
+          token.value = None();
+        }
+
+        break;
+      } else if isdigit(ch) {
+        start := self.position;
+        while isdigit(ch) {
+          self.get_next_char(&mut ch);
+        }
+        end := self.position;
+        length := end - start;
+
+        token.value = Some(String.{
+          data: strndup(self.input.data + start, length),
+          length: length,
+          capacity: length,
+        });
+
+        token.type = TokenType::Number;
+        break;
+      } else {
+        
+        type := switch ch {
+          '+' => TokenType::Add,
+          '-' => TokenType::Sub,
+          '/' => TokenType::Div,
+          '*' => TokenType::Mul,
+          '=' => TokenType::Assign,
+          '!' => TokenType::Not,
+          ',' => TokenType::Comma,
+          '.' => TokenType::Dot,
+          '(' => TokenType::OpenParen,
+          ')' => TokenType::CloseParen,
+          '{' => TokenType::OpenCurly,
+          '}' => TokenType::CloseCurly,
+          '[' => TokenType::OpenBracket,
+          ']' => TokenType::CloseBracket,
+          ';' => TokenType::Semi,
+          else => TokenType::Eof,
+        };
+
+        if type != TokenType::Eof {
+          self.advance(false);
+          token.type = type;
+          break;
+        }
+
+        start := self.position;
+        while ispunct(ch) {
+          self.get_next_char(&mut ch);
+        }
+        end := self.position;
+        length := end - start;
+
+        if end == start {
+          return Result::Err(.{
+            location: self.location,
+            message: format("invalid character: %", (ch, ), Format_Options::default()),
+          });
+        }
+
+        mut value := String.{
+          data: strndup(self.input.data + start, length),
+          length: length,
+          capacity: length,
+        };
+
+        token.type = switch value.as_str() {
+          "=" => TokenType::Assign,
+          "<" => TokenType::LT,
+          ">" => TokenType::GT,
+          ">=" => TokenType::GTE,
+          "<=" => TokenType::LTE,
+          "==" => TokenType::EQ,
+          "!=" => TokenType::NEQ,
+        };
+
+        value.deinit();
+
+        break;
+      }
+    }
+
+    return Result::Ok(token);
+  }
+}
