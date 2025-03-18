@@ -64,7 +64,6 @@ TokenType :: enum {
   
   Return,
   Fn,
-  Var,
   VarLocal,
   VarEnv,
 }
@@ -86,16 +85,15 @@ Lexer :: struct {
 
 impl Lexer {
   new :: fn(path: String) -> #self {
-    mut list: Token[];
-    list.initialize(8);
-
     mut keywords: Map!<str, TokenType>;
 
     keywords.insert("if", TokenType::If);
     keywords.insert("return", TokenType::Return);
     keywords.insert("fn", TokenType::Fn);
-    keywords.insert("var", TokenType::Var);
+    
+    keywords.insert("var", TokenType::VarLocal);
     keywords.insert("var:local", TokenType::VarLocal);
+
     keywords.insert("var:env", TokenType::VarEnv);
     keywords.insert("while", TokenType::While);
     keywords.insert("for", TokenType::For);
@@ -103,7 +101,6 @@ impl Lexer {
     keywords.insert("make", TokenType::Make);
 
     return .{
-      buffer: list,
       input: File::read_all(path.as_str()).unwrap(),
       location: (path, 0, 0),
       keywords: keywords,
@@ -146,7 +143,7 @@ impl Lexer {
 
       if ch == '_' || isalpha(ch) {
         start := self.position;
-        while ch == '_' || isalpha(ch) {
+        while ch == '_' || isalpha(ch) || ch == ':' {
           self.get_next_char(&mut ch);
         }
         end := self.position;
@@ -267,11 +264,11 @@ impl Lexer {
     return Result!<Token, LexError>::Ok(self.buffer.pop_front());
   }
 
-  peek :: fn(*mut self) -> Result!<Token, LexError> {
+  peek :: fn(*mut self) -> Token {
     if self.buffer.length == 0 {
       self.fill_buffer();
     }
-    return Result!<Token, LexError>::Ok(self.buffer[0]);
+    return self.buffer[0];
   }
 
   expect :: fn(*mut self, expected: TokenType) -> Result!<Token, LexError> {

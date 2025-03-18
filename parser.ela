@@ -1,3 +1,9 @@
+import lexer::*;
+
 Parser :: struct {
 
+}
+
+Expr :: struct {
+  members: (Expr, Option!<TokenType>)[],
 }

@@ -1,61 +1,18 @@
 import fmt::{
   println
 };
+
 import lexer::*;
-
-
-token_types := str.[
-  "Eof",
-  "Add",
-  "Sub",
-  "Div",
-  "Mul",
-  "Assign",
-  "Not",
-  "Comma",
-  "OpenParen",
-  "CloseParen",
-  "OpenCurly",
-  "CloseCurly",
-  "OpenBracket",
-  "CloseBracket",
-  "Semi",
-  "LT",
-  "LTE",
-  "GT",
-  "GTE",
-  "EQ",
-  "NEQ",
-  "Dot",
-  "Number",
-  "String",
-  "Identifier",
-  "If",
-  "For",
-  "In",
-  "While",
-  "Make",
-  "Return",
-  "Fn",
-  "Var",
-  "VarLocal",
-  "VarEnv",
-];
+import parser::*;
 
 main :: fn() {
   mut lexer := Lexer::new("test.shela".as_string());
 
   while {
-    token := lexer.get_token().expect(fn(error: LexError) {
-      printlnf("error: %\nat: %", (error.message, error.location.to_string()));
-      
-    });
-    if token.type == TokenType::Eof then break;
-
-    if token.type > 0 && token.type < token_types.length {
-      println(token_types.data[token.type]);
-    } else {
-      println(token.type);
+    if lexer.peek().type == TokenType::Eof {
+      break;
     }
+    token := lexer.eat().unwrap();
+    println(token);
   }
 }
