@@ -1,3 +1,222 @@
-Interp :: struct {
+import parser::*;
 
+impl!<T> T[] {
+  reverse :: fn(*mut self) {
+    len := self.length;
+
+    if len <= 1 then return;
+
+    for i in 0..(len / 2) {
+      high := len - 1 - i;
+      low := i;
+      temp := self.data[low];
+      self.data[low] = self.data[high];
+      self.data[high] = temp;
+    }
+  }
+}
+
+Interp :: struct {
+  scope: *mut Scope,
+  nodes: Node[],
+}
+
+impl Interp {
+  new :: fn(mut nodes: Node[]) -> #self {
+    nodes.reverse();
+    return .{
+      scope: new(Scope.{}),
+      nodes: nodes,
+    };
+  }
+
+  get_node :: fn(*mut self, index: NodeID) -> *mut Node {
+    return &mut self.nodes[index];
+  }
+
+  visit_if :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    return .{}
+  }
+  visit_else :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    return .{}
+  }
+  visit_while :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    return .{}
+  }
+  visit_for :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    return .{}
+  }
+  visit_continue :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    return .{}
+  }
+  visit_break :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    return .{}
+  }
+  visit_variable :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    return .{}
+  }
+  visit_call :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    return .{}
+  }
+  visit_binary :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    return .{}
+  }
+  visit_unary :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    return .{}
+  }
+  visit_member_access :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    return .{}
+  }
+  visit_subscript :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    return .{}
+  }
+  visit_object_literal :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    return .{}
+  }
+  visit_array_literal :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    return .{}
+  }
+
+  visit_type :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    return .{};
+  }
+
+  visit_block :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    return .{};
+  }
+
+  visit_function :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    funcy := node.function;
+
+    rc := Rc!<Value>::new(Value.{
+      tag: ValueTag::Function,
+      function: &mut node.function,
+    });
+
+    self.scope.insert(funcy.name, rc);
+
+    old_scope := self.scope;
+    block := self.get_node(funcy.block);
+    block.block.scope = old_scope.create_child();
+    self.scope = block.block.scope;
+
+    for param in funcy.parameters {
+      self.scope.insert(param, Value::None());
+    }
+
+    self.visit_block(block);
+    self.scope = old_scope;
+
+    return rc;
+  }
+
+  visit :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    switch node.tag {
+      NodeTag::Boolean: {
+        return Rc!<Value>::new(Value.{
+          tag: ValueTag::Boolean,
+          boolean: node.boolean,
+        });
+      }
+      NodeTag::Number: {
+        return Rc!<Value>::new(Value.{
+          tag: ValueTag::Number,
+          number: node.number,
+        });
+      }
+      NodeTag::String: {
+        return Rc!<Value>::new(Value.{
+          tag: ValueTag::String,
+          string: node.string,
+        });
+      }
+      NodeTag::Identifier: {
+        variable := self.scope.lookup(node.identifier);
+        if variable.is_none() {
+          printlnf("use of undeclared variable: %", (node.identifier,));
+          exit(1);
+        }
+      }
+      NodeTag::Binary: {
+        return self.visit_binary(node);
+      }
+      NodeTag::Unary: {
+        return self.visit_unary(node);
+      }
+      NodeTag::MemberAccess: {
+        return self.visit_member_access(node);
+      }
+      NodeTag::Subscript: {
+        return self.visit_subscript(node);
+      }
+      NodeTag::ObjectLiteral: {
+        return self.visit_object_literal(node);
+      }
+      NodeTag::ArrayLiteral: {
+        return self.visit_array_literal(node);
+      }
+      NodeTag::Block: {
+        return self.visit_block(node);
+      }
+      NodeTag::Function: {
+        return self.visit_function(node);
+      }
+      NodeTag::If: {
+        return self.visit_if(node);
+      }
+      NodeTag::Else: {
+        return self.visit_else(node);
+      }
+      NodeTag::While: {
+        return self.visit_while(node);
+      }
+      NodeTag::For: {
+        return self.visit_for(node);
+      }
+      NodeTag::Continue: {
+        return self.visit_continue(node);
+      }
+      NodeTag::Break: {
+        return self.visit_break(node);
+      }
+      NodeTag::Variable: {
+        return self.visit_variable(node);
+      }
+      NodeTag::Call: {
+        return self.visit_call(node);
+      }
+      NodeTag::TypeDeclaration: {
+        return self.visit_type(node);
+      }
+    }
+    return Value::None();
+  }
+
+
+  run :: fn(*mut self) -> Value {
+    mut visited_indices: NodeID[];
+    for i in 0..self.nodes.length {
+      node := &mut self.nodes[i];
+      if node.tag == NodeTag::Function {
+        visited_indices.push(i);
+        self.visit_function(node);
+      } else if node.tag == NodeTag::TypeDeclaration {
+        visited_indices.push(i);
+        self.visit_type(node);
+      }
+    }
+
+
+    for i in 0..self.nodes.length {
+      // already visited.
+      // we could probably just remove these nodes, but we need them to stay alive.
+      if visited_indices.contains(i, fn(a: u32, b: u32) -> bool {
+        return a == b;
+      }) then continue;
+
+      self.visit(&mut self.nodes[i]);
+    }
+
+    return .{};
+  }
 }

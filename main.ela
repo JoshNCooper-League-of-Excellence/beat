@@ -1,9 +1,12 @@
 import fmt::*;
 import lexer::*;
 import parser::*;
+import interp::*;
 
 main :: fn() {
   mut lexer := Lexer::new("test.shela".as_string());
   mut parser := Parser::new();
-  nodes := parser.parse(&mut lexer);
+  mut nodes := parser.parse(&mut lexer);
+  mut interp := Interp::new(nodes);
+  interp.run();
 }

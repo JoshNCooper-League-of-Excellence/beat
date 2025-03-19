@@ -1,0 +1,40 @@
+Rc :: struct!<T> {
+  ptr: *mut T,
+  rc: *mut u64,
+}
+
+impl!<T> Deinit for Rc!<T> {
+  deinit :: fn(*mut self) {
+    *self.rc -= 1;
+    if *self.rc <= 0 {
+      free(self.ptr);
+      free(self.rc);
+    }
+  }
+}
+
+impl!<T> Clone for Rc!<T> {
+  clone :: fn(self) -> #self {
+    *self.rc += 1;
+    return .{
+      ptr: self.ptr,
+      rc: self.rc,
+    }
+  }
+}
+
+impl!<T> Rc!<T> {
+  new :: fn(value: T) -> #self {
+    return .{
+      ptr:  new(value),
+      rc:   new(1 as u64),
+    }
+  }
+
+  empty :: fn() -> #self {
+    return .{
+      ptr: null,
+      rc:  new(1 as u64)
+    }
+  }
+}

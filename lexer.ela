@@ -156,6 +156,51 @@ impl Lexer {
         continue;
       }
 
+      if ch == '/' {
+        self.get_next_char(&mut ch);
+        if ch == '/' {
+          while ch != '\n' && self.position < self.input.length {
+            self.get_next_char(&mut ch);
+          }
+          continue;
+        } else if ch == '*' {
+          while self.position < self.input.length {
+            self.get_next_char(&mut ch);
+            if ch == '*' {
+              self.get_next_char(&mut ch);
+              if ch == '/' {
+                break;
+              }
+            }
+          }
+          continue;
+        } else {
+          self.position--;
+          ch = '/';
+        }
+      }
+
+      if ch == '\'' || ch == '\"' {
+        quote_char := ch;
+        start := self.position;
+        self.get_next_char(&mut ch);
+        while ch != quote_char && self.position < self.input.length {
+          self.get_next_char(&mut ch);
+        }
+        end := self.position;
+        length := end - start - 1;
+
+        token.value = Some(String.{
+          data: strndup(self.input.data + start + 1, length),
+          length: length,
+          capacity: length,
+        });
+
+        token.type = TType::String;
+        self.advance(false);
+        break;
+      }
+
       if ch == '_' || isalpha(ch) {
         start := self.position;
         while ch == '_' || isalnum(ch) || ch == ':' {

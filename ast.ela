@@ -1,0 +1,219 @@
+import fmt::*;
+import lexer::*;
+import rc::*;
+import map::Map;
+
+alias NodeID :: u32;
+
+ValueTag :: enum {
+  None,
+  Number,
+  String,
+  Boolean,
+  Object,
+  Array,
+  Function,
+}
+
+Value :: struct {
+  tag: ValueTag,
+  #anon :: union {
+    number: f64,
+    string: String,
+    boolean: bool,
+    object: Map!<String, Rc!<Value>>,
+    array:  List!<Rc!<Value>>,
+    function: *mut Function,
+  }
+}
+
+impl Value {
+  None :: fn() -> Rc!<#self> {
+    #static mut none: Rc!<#self>;
+    if none.ptr == null {
+      none = Rc!<Value>::new(Value.{});
+    }
+    return none;
+  }
+}
+
+Scope :: struct {
+  parent: Option!<*mut Scope>,
+  symbols: Map!<String, Rc!<Value>>,
+}
+
+impl Scope {
+  insert :: fn(*mut self, key: String, value: Rc!<Value>) {
+    mut node := self;
+    while {
+      option := node.symbols.get_mut(key);
+      if option.is_some() {
+        *option.unwrap() = value.clone();
+        return;
+      }
+      if node.parent.is_none() {
+        break;
+      }
+      node = node.parent.unwrap();
+    }
+    self.symbols.insert(key, value.clone());
+  }
+  lookup :: fn(*const self, key: String) -> Option!<Rc!<Value>> {
+    mut option := self.symbols.get(key);
+    if option.is_none() && self.parent.is_some() {
+      return self.parent.unwrap().lookup(key);
+    }
+
+    if option.is_some() {
+      option = Some(option.unwrap().clone());
+    }
+    return option;
+  }
+  create_child :: fn(*mut self) -> *mut Scope {
+    return new(Scope.{
+      parent: Some(self),
+    });
+  }
+}
+
+Unary :: struct {
+  operand: NodeID,
+  operator: TType,
+}
+
+Binary :: struct {
+  left: NodeID,
+  right: NodeID,
+  operator: TType,
+}
+
+MemberAccess :: struct {
+  base: NodeID,
+  member: String,
+}
+
+Subscript :: struct {
+  base: NodeID,
+  index: NodeID,
+}
+
+Call :: struct {
+  callee: NodeID,
+  arguments: NodeID[]
+}
+
+ObjectLiteral :: struct {
+  key_values: Map!<String, NodeID>,
+}
+
+ArrayLiteral :: struct {
+  values: NodeID[],
+}
+
+Block :: struct {
+  scope: *mut Scope,
+  statements: NodeID[],
+}
+
+Function :: struct {
+  name: String,
+  parameters: String[],
+  block: NodeID,
+}
+
+TypeDeclaration :: struct {
+  name: String,
+  members: Map!<String, Option!<NodeID>>,
+}
+
+If :: struct {
+  condition: NodeID,
+  block: NodeID,
+  else_node: Option!<NodeID>,
+}
+
+Else :: struct {
+  if_node: Option!<NodeID>,
+  block: Option!<NodeID>,
+}
+
+While :: struct {
+  condition: Option!<NodeID>,
+  block: NodeID,
+}
+
+For :: struct {
+  target: NodeID,
+  identifier: String,
+  block: NodeID,
+}
+
+Return :: struct {
+  expression: Option!<NodeID>
+}
+
+Variable :: struct {
+  name: String,
+  value: Option!<NodeID>,
+}
+
+NodeTag :: enum {
+  Boolean,
+  Number,
+  String,
+  Identifier,
+  Binary,
+  Unary,
+  MemberAccess,
+  Subscript,
+
+  ObjectLiteral,
+  ArrayLiteral,
+
+  Block,
+  Function,
+
+  If,
+  Else,
+  While,
+  For,
+
+  Return,
+  Continue,
+  Break,
+
+  Variable,
+  Call,
+  TypeDeclaration,
+}
+
+Node :: struct {
+  tag: NodeTag,
+  #anon :: union {
+    boolean: bool,
+    number: f64,
+    string: String,
+    identifier: String,
+    binary: Binary,
+    unary: Unary,
+
+    object_literal: ObjectLiteral,
+    array_literal: ArrayLiteral,
+    type_declaration: TypeDeclaration,
+
+    function: Function,
+    block: Block,
+
+    if_node: If,
+    else_node: Else,
+    for_node: For,
+    while_node: While,
+
+    return_node: Return,
+
+    call: Call,
+    member_access: MemberAccess,
+    variable: Variable,
+
+  },
+}

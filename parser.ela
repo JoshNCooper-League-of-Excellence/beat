@@ -1,150 +1,5 @@
-import fmt::*;
-import lexer::*;
 
-#region AST {
-  alias NodeID :: u32;
-
-  NodeTag :: enum {
-    Boolean,
-    Number,
-    String,
-    Identifier,
-    Binary,
-    Unary,
-    MemberAccess,
-    Subscript,
-
-    ObjectLiteral,
-    ArrayLiteral,
-
-    Block,
-    Function,
-
-    If,
-    Else,
-    While,
-    For,
-
-    Return,
-    Continue,
-    Break,
-
-    Variable,
-    Call,
-    TypeDeclaration,
-  }
-
-  Unary :: struct {
-    operand: NodeID,
-    operator: TType,
-  }
-
-  Binary :: struct {
-    left: NodeID,
-    right: NodeID,
-    operator: TType,
-  }
-
-  MemberAccess :: struct {
-    base: NodeID,
-    member: String,
-  }
-
-  Subscript :: struct {
-    base: NodeID,
-    index: NodeID,
-  }
-
-  Call :: struct {
-    callee: NodeID,
-    arguments: NodeID[]
-  }
-
-  ObjectLiteral :: struct {
-    key_values: Map!<String, NodeID>,
-  }
-
-  ArrayLiteral :: struct {
-    values: NodeID[],
-  }
-
-  Block :: struct {
-    statements: NodeID[],
-  }
-
-  Function :: struct {
-    name: String,
-    parameters: String[],
-    block: NodeID,
-  }
-
-  TypeDeclaration :: struct {
-    name: String,
-    members: Map!<String, Option!<NodeID>>,
-  }
-
-  If :: struct {
-    condition: NodeID,
-    block: NodeID,
-    else_node: Option!<NodeID>,
-  }
-
-  Else :: struct {
-    if_node: Option!<NodeID>,
-    block: Option!<NodeID>,
-  }
-
-  While :: struct {
-    condition: Option!<NodeID>,
-    block: NodeID,
-  }
-
-  For :: struct {
-    target: NodeID,
-    identifier: String,
-    block: NodeID,
-  }
-
-  Return :: struct {
-    expression: Option!<NodeID>
-  }
-
-  Variable :: struct {
-    name: String,
-    value: Option!<NodeID>,
-  }
-
-  Node :: struct {
-    tag: NodeTag,
-    #anon :: struct {
-      boolean: bool,
-      number: f64,
-      string: String,
-      identifier: String,
-      binary: Binary,
-      unary: Unary,
-
-      object_literal: ObjectLiteral,
-      array_literal: ArrayLiteral,
-      type_declaration: TypeDeclaration,
-
-      function: Function,
-      block: Block,
-
-      if_node: If,
-      else_node: Else,
-      for_node: For,
-      while_node: While,
-
-      return_node: Return,
-
-      call: Call,
-      member_access: MemberAccess,
-      variable: Variable,
-
-    },
-  }
-}
+import ast::*;
 
 Parser :: struct {
   nodes: Node[],
@@ -333,7 +188,7 @@ impl Parser {
     token := lexer.peek();
     if token.type == TType::Not || token.type == TType::Sub {
       lexer.eat();
-      operand := self.parse_unary(lexer);
+      operand := self.parse_postfix(lexer);
       return self.add_node(.{
         tag: NodeTag::Unary,
         unary: .{
@@ -342,7 +197,7 @@ impl Parser {
         },
       });
     }
-    return self.parse_primary(lexer);
+    return self.parse_postfix(lexer);
   }
 
   parse_binary :: fn(*mut self, lexer: *mut Lexer, mut left: NodeID, precedence: Precedence) -> NodeID {
