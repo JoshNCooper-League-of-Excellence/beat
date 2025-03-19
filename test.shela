@@ -50,4 +50,4 @@ var object = { x = 10, y = 10, z = 100 };
 
 var array = [0, 1, 2];
 
-var other_array = [];
+var array1 = [];

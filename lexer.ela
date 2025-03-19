@@ -96,7 +96,7 @@ impl Lexer {
 
     keywords.insert("if", TType::If);
     keywords.insert("else", TType::Else);
-    
+
     keywords.insert("fn", TType::Fn);
     
     keywords.insert("var", TType::Var);
@@ -158,7 +158,7 @@ impl Lexer {
 
       if ch == '_' || isalpha(ch) {
         start := self.position;
-        while ch == '_' || isalpha(ch) || ch == ':' {
+        while ch == '_' || isalnum(ch) || ch == ':' {
           self.get_next_char(&mut ch);
         }
         end := self.position;
