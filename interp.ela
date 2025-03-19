@@ -100,13 +100,18 @@ impl Interp {
     block.block.scope = old_scope.create_child();
     self.scope = block.block.scope;
 
+    old_nodes := self.nodes;
+    self.nodes = block.block.statements;
+
     for param in funcy.parameters {
       self.scope.insert(param, Value::None());
     }
 
-    self.visit_block(block);
-    self.scope = old_scope;
+    // ! We don't actually visit this here, this is for execution time.
+    // self.visit_block(block);
 
+    self.nodes = old_nodes;
+    self.scope = old_scope;
     return rc;
   }
 

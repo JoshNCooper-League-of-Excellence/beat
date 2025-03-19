@@ -364,11 +364,20 @@ impl Parser {
 
   parse_block :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
     lexer.expect(TType::OpenCurly).unwrap();
-    mut statements: NodeID[];
+
+    mut statements: Node[];
+    old_statements := self.nodes;
+    self.nodes = statements;
+
     while lexer.peek().type != TType::CloseCurly {
-      statements.push(self.parse_statement(lexer));
+      self.parse_statement(lexer);
     }
+
     lexer.expect(TType::CloseCurly).unwrap();
+
+    statements = self.nodes;
+    self.nodes = old_statements;
+
     return self.add_node(.{
       tag: NodeTag::Block,
       block: .{

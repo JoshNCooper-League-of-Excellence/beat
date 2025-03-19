@@ -112,7 +112,7 @@ ArrayLiteral :: struct {
 
 Block :: struct {
   scope: *mut Scope,
-  statements: NodeID[],
+  statements: Node[],
 }
 
 Function :: struct {

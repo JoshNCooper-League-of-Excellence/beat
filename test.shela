@@ -52,5 +52,5 @@
 // var x = object.main('Hello, Squirreld');
 
 fn main(a) {
-  return a;
+  print(a);
 }
