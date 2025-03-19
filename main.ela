@@ -5,7 +5,5 @@ import parser::*;
 main :: fn() {
   mut lexer := Lexer::new("test.shela".as_string());
   mut parser := Parser::new();
-  
   nodes := parser.parse(&mut lexer);
-  println(nodes.length);
 }

@@ -1,3 +1,4 @@
+import fmt::*;
 import lexer::*;
 
 #region AST {
@@ -113,9 +114,6 @@ import lexer::*;
     value: Option!<NodeID>,
   }
 
-  Continue :: struct {}
-  Break    :: struct {}
-
   Node :: struct {
     tag: NodeTag,
     #anon :: struct {
@@ -139,8 +137,6 @@ import lexer::*;
       while_node: While,
 
       return_node: Return,
-      continue_node: Continue,
-      break_node: Break,
 
       call: Call,
       member_access: MemberAccess,
@@ -209,8 +205,42 @@ impl Parser {
   parse_primary :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
     token := lexer.peek();
     switch token.type {
-      TType::OpenCurly: {  /* Object literal. */ }
-      TType::OpenBracket: { /* Array literal */ }
+      TType::OpenCurly: {  
+        lexer.eat();
+        mut values: Map!<String, NodeID>;
+        while lexer.peek().type != TType::CloseCurly {
+          name := lexer.expect(TType::Identifier).unwrap().value.unwrap();
+          lexer.expect(TType::Assign).unwrap();
+          values.insert(name, self.parse_expression(lexer));
+          if lexer.peek().type != TType::CloseCurly {
+            lexer.expect(TType::Comma).unwrap();
+          }
+        }
+        lexer.expect(TType::CloseCurly).unwrap();
+        return self.add_node(.{
+          tag: NodeTag::ObjectLiteral,
+          object_literal: .{
+            key_values: values,
+          } 
+        });
+      }
+      TType::OpenBracket: { 
+        lexer.eat();
+        mut values: NodeID[];
+        while lexer.peek().type != TType::CloseBracket {
+          values.push(self.parse_expression(lexer));
+          if lexer.peek().type != TType::CloseBracket {
+            lexer.expect(TType::Comma).unwrap();
+          }
+        }
+        lexer.expect(TType::CloseBracket).unwrap();
+        return self.add_node(.{
+          tag: NodeTag::ArrayLiteral,
+          array_literal: .{
+            values: values,
+          } 
+        });
+      }
       TType::Number: {
         lexer.eat();
         return self.add_node(.{
@@ -360,11 +390,13 @@ impl Parser {
       });
     } else {
       lexer.expect(TType::Assign).unwrap();
+      value := Some(self.parse_expression(lexer));
+      lexer.expect(TType::Semi).unwrap();
       return self.add_node(.{
         tag: NodeTag::Variable,
         variable: .{
           name: name,
-          value: Some(self.parse_expression(lexer)),
+          value: value,
         }
       });
     }
@@ -455,6 +487,7 @@ impl Parser {
       key := lexer.eat().unwrap().value.unwrap();
       mut value: Option!<NodeID> = None();
       if lexer.peek().type == TType::Assign {
+        lexer.eat();
         value = Some(self.parse_expression(lexer));
       } 
       if lexer.peek().type != TType::CloseCurly {
@@ -555,7 +588,6 @@ impl Parser {
         lexer.expect(TType::Semi).unwrap();
         return self.add_node(.{
           tag: NodeTag::Continue,
-          continue_node: .{},
         });
       }
       TType::Break: {
@@ -563,7 +595,6 @@ impl Parser {
         lexer.expect(TType::Semi).unwrap();
         return self.add_node(.{
           tag: NodeTag::Break,
-          break_node: .{},
         });
       }
       else: {

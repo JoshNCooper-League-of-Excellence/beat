@@ -95,6 +95,8 @@ impl Lexer {
     mut keywords: Map!<str, TType>;
 
     keywords.insert("if", TType::If);
+    keywords.insert("else", TType::Else);
+    
     keywords.insert("fn", TType::Fn);
     
     keywords.insert("var", TType::Var);
