@@ -9,4 +9,5 @@ main :: fn() {
   mut nodes := parser.parse(&mut lexer);
   mut interp := Interp::new(nodes);
   interp.run();
+
 }

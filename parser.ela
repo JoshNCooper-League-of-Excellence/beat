@@ -332,36 +332,6 @@ impl Parser {
     });
   }
 
-  parse_type :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
-    lexer.expect(TType::Type).unwrap();
-    name := lexer.expect(TType::Identifier).unwrap().value.unwrap();
-    lexer.expect(TType::Assign).unwrap();
-    lexer.expect(TType::OpenCurly).unwrap();
-    mut key_values: Map!<String, Option!<NodeID>>;
-    while lexer.peek().type == TType::Identifier {
-      key := lexer.eat().unwrap().value.unwrap();
-      mut value: Option!<NodeID> = None();
-      if lexer.peek().type == TType::Assign {
-        lexer.eat();
-        value = Some(self.parse_expression(lexer));
-      } 
-      if lexer.peek().type != TType::CloseCurly {
-        lexer.expect(TType::Comma).unwrap();
-      } else {
-        lexer.eat();
-        break;
-      }
-      key_values.insert(key, value);
-    }
-    return self.add_node(.{
-      tag: NodeTag::TypeDeclaration,
-      type_declaration: .{
-        name: name,
-        members: key_values,
-      }
-    });
-  }
-
   parse_block :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
     lexer.expect(TType::OpenCurly).unwrap();
 
@@ -427,9 +397,7 @@ impl Parser {
       TType::For: {
         return self.parse_for(lexer);
       }
-      TType::Type: {
-        return self.parse_type(lexer);
-      }
+
       TType::Fn: {
         return self.parse_function(lexer);
       }

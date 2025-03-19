@@ -69,8 +69,6 @@ TType :: enum {
   Fn,
   Var,
 
-  Type,
-
   True,
   False,
 }
@@ -105,9 +103,6 @@ impl Lexer {
     keywords.insert("for", TType::For);
     keywords.insert("in", TType::In);
     keywords.insert("make", TType::Make);
-
-    keywords.insert("type", TType::Type);
-
     keywords.insert("return", TType::Return);
     keywords.insert("continue", TType::Continue);
     keywords.insert("break", TType::Break);

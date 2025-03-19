@@ -21,6 +21,19 @@ Interp :: struct {
   nodes: Node[],
 }
 
+ControlFlow :: enum {
+  None,
+  Continue,
+  Break,
+  Return,
+}
+
+// StatementResult :: (ControlFlow, Option!<Rc!<Value>>);
+StatementResult :: struct {
+  control_flow: ControlFlow,
+  value: Option!<Rc!<Value>>,
+}
+
 impl Interp {
   new :: fn(mut nodes: Node[]) -> #self {
     nodes.reverse();
@@ -29,34 +42,20 @@ impl Interp {
       nodes: nodes,
     };
   }
-
+  
   get_node :: fn(*mut self, index: NodeID) -> *mut Node {
     return &mut self.nodes[index];
   }
 
-  visit_if :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    return .{}
-  }
-  visit_else :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    return .{}
-  }
-  visit_while :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    return .{}
-  }
-  visit_for :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    return .{}
-  }
-  visit_continue :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    return .{}
-  }
-  visit_break :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    return .{}
-  }
-  visit_variable :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    return .{}
-  }
   visit_call :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    return .{}
+    function := self.visit_expression(self.get_node(node.call.callee));
+    mut args: List!<Rc!<Value>>;
+    for arg in node.call.arguments {
+      node := self.get_node(arg);
+      args.push(self.visit_expression(node));
+    }
+
+    return self.visit_function(function.ptr.function, args);
   }
   visit_binary :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
     return .{}
@@ -77,23 +76,57 @@ impl Interp {
     return .{}
   }
 
-  visit_type :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+  visit_block :: fn(*mut self, node: *mut Node) -> StatementResult {
     return .{};
   }
-
-  visit_block :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    return .{};
+  visit_if :: fn(*mut self, node: *mut Node) -> StatementResult {
+    return .{}
+  }
+  visit_else :: fn(*mut self, node: *mut Node) -> StatementResult {
+    return .{}
+  }
+  visit_while :: fn(*mut self, node: *mut Node) -> StatementResult {
+    return .{}
+  }
+  visit_for :: fn(*mut self, node: *mut Node) -> StatementResult {
+    return .{}
+  }
+  visit_variable :: fn(*mut self, node: *mut Node) -> StatementResult {
+    return .{}
   }
 
-  visit_function :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+  visit_function :: fn(*mut self, function: *mut Function, args: List!<Rc!<Value>>) -> Rc!<Value> {
+    old_scope := self.scope;
+    block := self.get_node(function.block);
+    self.scope = block.block.scope;
+
+    defer self.scope = block.block.scope;
+
+    mut i := 0;
+    for param in function.parameters {
+      if i >= args.length {
+        break;
+      }
+      self.scope.insert(param, args[i]);
+      i++;
+    }
+
+    _, value := self.visit_block(block);
+
+    if value.is_none() {
+      return Value::None();
+    } else {
+      return value.unwrap();
+    }
+  }
+
+  visit_function_header :: fn(*mut self, node: *mut Node) {
     funcy := node.function;
 
-    rc := Rc!<Value>::new(Value.{
+    self.scope.insert(funcy.name, Rc!<Value>::new(Value.{
       tag: ValueTag::Function,
       function: &mut node.function,
-    });
-
-    self.scope.insert(funcy.name, rc);
+    }));
 
     old_scope := self.scope;
     block := self.get_node(funcy.block);
@@ -107,15 +140,13 @@ impl Interp {
       self.scope.insert(param, Value::None());
     }
 
-    // ! We don't actually visit this here, this is for execution time.
-    // self.visit_block(block);
+    // ! We don't actually the block here, that's is for execution time, which is handled via the symbol table.
 
     self.nodes = old_nodes;
     self.scope = old_scope;
-    return rc;
   }
 
-  visit :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+  visit_expression :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
     switch node.tag {
       NodeTag::Boolean: {
         return Rc!<Value>::new(Value.{
@@ -141,6 +172,7 @@ impl Interp {
           printlnf("use of undeclared variable: %", (node.identifier,));
           exit(1);
         }
+        return variable.unwrap().clone();
       }
       NodeTag::Binary: {
         return self.visit_binary(node);
@@ -160,11 +192,33 @@ impl Interp {
       NodeTag::ArrayLiteral: {
         return self.visit_array_literal(node);
       }
+      NodeTag::Call: {
+        return self.visit_call(node);
+      }
+    }
+    return Value::None();
+  } 
+
+  visit_statement :: fn(*mut self, node: *mut Node) -> StatementResult {
+    if node.tag == NodeTag::Boolean ||
+       node.tag ==  NodeTag::Number ||
+       node.tag ==  NodeTag::String ||
+       node.tag ==  NodeTag::Identifier ||
+       node.tag ==  NodeTag::Binary ||
+       node.tag ==  NodeTag::Unary ||
+       node.tag ==  NodeTag::MemberAccess ||
+       node.tag ==  NodeTag::Subscript ||
+       node.tag ==  NodeTag::ObjectLiteral ||
+       node.tag ==  NodeTag::ArrayLiteral ||
+       node.tag ==  NodeTag::Call {
+        return .{
+          control_flow: ControlFlow::None,
+          value:  Some(self.visit_expression(node)),
+        }
+    }
+    switch node.tag {
       NodeTag::Block: {
         return self.visit_block(node);
-      }
-      NodeTag::Function: {
-        return self.visit_function(node);
       }
       NodeTag::If: {
         return self.visit_if(node);
@@ -179,24 +233,33 @@ impl Interp {
         return self.visit_for(node);
       }
       NodeTag::Continue: {
-        return self.visit_continue(node);
+        return .{
+          control_flow: ControlFlow::Continue,
+        };
       }
       NodeTag::Break: {
-        return self.visit_break(node);
+        return .{
+          control_flow: ControlFlow::Break,
+        };
+      }
+      NodeTag::Return: {
+        mut value: Option!<Rc!<Value>>;
+
+        if node.return_node.expression.is_some() {
+          value = Some(self.visit_expression(self.get_node(node.return_node.expression.unwrap())));
+        }
+
+        return .{
+          control_flow: ControlFlow::Return,
+          value: value,
+        };
       }
       NodeTag::Variable: {
         return self.visit_variable(node);
       }
-      NodeTag::Call: {
-        return self.visit_call(node);
-      }
-      NodeTag::TypeDeclaration: {
-        return self.visit_type(node);
-      }
     }
-    return Value::None();
+    return .{};
   }
-
 
   run :: fn(*mut self) -> Value {
     mut visited_indices: NodeID[];
@@ -204,13 +267,9 @@ impl Interp {
       node := &mut self.nodes[i];
       if node.tag == NodeTag::Function {
         visited_indices.push(i);
-        self.visit_function(node);
-      } else if node.tag == NodeTag::TypeDeclaration {
-        visited_indices.push(i);
-        self.visit_type(node);
+        self.visit_function_header(node);
       }
     }
-
 
     for i in 0..self.nodes.length {
       // already visited.
@@ -219,7 +278,7 @@ impl Interp {
         return a == b;
       }) then continue;
 
-      self.visit(&mut self.nodes[i]);
+      self.visit_statement(&mut self.nodes[i]);
     }
 
     return .{};

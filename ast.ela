@@ -184,7 +184,6 @@ NodeTag :: enum {
 
   Variable,
   Call,
-  TypeDeclaration,
 }
 
 Node :: struct {
@@ -199,7 +198,6 @@ Node :: struct {
 
     object_literal: ObjectLiteral,
     array_literal: ArrayLiteral,
-    type_declaration: TypeDeclaration,
 
     function: Function,
     block: Block,
