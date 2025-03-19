@@ -1,7 +1,7 @@
 import fmt::{
   format,
   printlnf,
-  Format_Options,
+  FormatOptions,
 };
 
 import map::Map;
@@ -13,7 +13,7 @@ alias SourceLocation :: (String, u32, u32);
 
 impl SourceLocation {
   to_string :: fn(self) -> String {
-    return format("%:%:%", self, Format_Options::default());
+    return format("%:%:%", self, FormatOptions::default());
   }
 }
 LexError :: struct {
@@ -21,7 +21,7 @@ LexError :: struct {
   message:  String,
 }
 
-TokenType :: enum {
+TType :: enum {
   Eof,
 
   Add,
@@ -53,23 +53,30 @@ TokenType :: enum {
 
   Number,
   String,
-
   Identifier,
 
   If,
+  Else,
   For,
   In,
   While,
   Make,
   
   Return,
+  Continue,
+  Break,
+  
   Fn,
-  VarLocal,
-  VarEnv,
+  Var,
+
+  Type,
+
+  True,
+  False,
 }
 
 Token :: struct {
-  type: TokenType,
+  type: TType,
   value: Option!<String>,
   location: SourceLocation,
 }
@@ -80,25 +87,31 @@ Lexer :: struct {
   buffer: Token[],
   position: u32,
 
-  keywords: Map!<str, TokenType>,
+  keywords: Map!<str, TType>,
 }
 
 impl Lexer {
   new :: fn(path: String) -> #self {
-    mut keywords: Map!<str, TokenType>;
+    mut keywords: Map!<str, TType>;
 
-    keywords.insert("if", TokenType::If);
-    keywords.insert("return", TokenType::Return);
-    keywords.insert("fn", TokenType::Fn);
+    keywords.insert("if", TType::If);
+    keywords.insert("fn", TType::Fn);
     
-    keywords.insert("var", TokenType::VarLocal);
-    keywords.insert("var:local", TokenType::VarLocal);
+    keywords.insert("var", TType::Var);
 
-    keywords.insert("var:env", TokenType::VarEnv);
-    keywords.insert("while", TokenType::While);
-    keywords.insert("for", TokenType::For);
-    keywords.insert("in", TokenType::In);
-    keywords.insert("make", TokenType::Make);
+    keywords.insert("while", TType::While);
+    keywords.insert("for", TType::For);
+    keywords.insert("in", TType::In);
+    keywords.insert("make", TType::Make);
+
+    keywords.insert("type", TType::Type);
+
+    keywords.insert("return", TType::Return);
+    keywords.insert("continue", TType::Continue);
+    keywords.insert("break", TType::Break);
+
+    keywords.insert("true", TType::True);
+    keywords.insert("false", TType::False);
 
     return .{
       input: File::read_all(path.as_str()).unwrap(),
@@ -126,7 +139,7 @@ impl Lexer {
     alias Result :: Result!<Token, LexError>;
     mut token: Token;
 
-    token.type = TokenType::Eof;
+    token.type = TType::Eof;
 
     while self.position < self.input.length {
       mut ch := self.input[self.position];
@@ -156,7 +169,7 @@ impl Lexer {
           capacity: length,
         });
 
-        token.type = TokenType::Identifier;
+        token.type = TType::Identifier;
 
         mut value := token.value.unwrap();
 
@@ -184,29 +197,29 @@ impl Lexer {
           capacity: length,
         });
 
-        token.type = TokenType::Number;
+        token.type = TType::Number;
         break;
       } else {
         type := switch ch {
-          '+' => TokenType::Add,
-          '-' => TokenType::Sub,
-          '/' => TokenType::Div,
-          '*' => TokenType::Mul,
-          '=' => TokenType::Assign,
-          '!' => TokenType::Not,
-          ',' => TokenType::Comma,
-          '.' => TokenType::Dot,
-          '(' => TokenType::OpenParen,
-          ')' => TokenType::CloseParen,
-          '{' => TokenType::OpenCurly,
-          '}' => TokenType::CloseCurly,
-          '[' => TokenType::OpenBracket,
-          ']' => TokenType::CloseBracket,
-          ';' => TokenType::Semi,
-          else => TokenType::Eof,
+          '+' => TType::Add,
+          '-' => TType::Sub,
+          '/' => TType::Div,
+          '*' => TType::Mul,
+          '=' => TType::Assign,
+          '!' => TType::Not,
+          ',' => TType::Comma,
+          '.' => TType::Dot,
+          '(' => TType::OpenParen,
+          ')' => TType::CloseParen,
+          '{' => TType::OpenCurly,
+          '}' => TType::CloseCurly,
+          '[' => TType::OpenBracket,
+          ']' => TType::CloseBracket,
+          ';' => TType::Semi,
+          else => TType::Eof,
         };
 
-        if type != TokenType::Eof {
+        if type != TType::Eof {
           self.advance(false);
           token.type = type;
           break;
@@ -227,13 +240,13 @@ impl Lexer {
         };
 
         token.type = switch value.as_str() {
-          "=" => TokenType::Assign,
-          "<" => TokenType::LT,
-          ">" => TokenType::GT,
-          ">=" => TokenType::GTE,
-          "<=" => TokenType::LTE,
-          "==" => TokenType::EQ,
-          "!=" => TokenType::NEQ,
+          "=" => TType::Assign,
+          "<" => TType::LT,
+          ">" => TType::GT,
+          ">=" => TType::GTE,
+          "<=" => TType::LTE,
+          "==" => TType::EQ,
+          "!=" => TType::NEQ,
         };
 
         value.deinit();
@@ -271,7 +284,7 @@ impl Lexer {
     return self.buffer[0];
   }
 
-  expect :: fn(*mut self, expected: TokenType) -> Result!<Token, LexError> {
+  expect :: fn(*mut self, expected: TType) -> Result!<Token, LexError> {
     token_result := self.eat();
 
     if (token_result.is_err()) {
@@ -283,7 +296,7 @@ impl Lexer {
     if token.type != expected {
       return Result!<Token, LexError>::Err(LexError.{
         location: token.location,
-        message: format("Expected token type: %, but got: %", (expected, token.type), Format_Options::default()),
+        message: format("Expected token type: %, but got: %", (expected, token.type), FormatOptions::default()),
       });
     }
     return Result!<Token, LexError>::Ok(token);

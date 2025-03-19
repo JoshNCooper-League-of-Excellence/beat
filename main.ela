@@ -1,18 +1,11 @@
-import fmt::{
-  println
-};
-
+import fmt::*;
 import lexer::*;
 import parser::*;
 
 main :: fn() {
   mut lexer := Lexer::new("test.shela".as_string());
-
-  while {
-    if lexer.peek().type == TokenType::Eof {
-      break;
-    }
-    token := lexer.eat().unwrap();
-    println(token);
-  }
+  mut parser := Parser::new();
+  
+  nodes := parser.parse(&mut lexer);
+  println(nodes.length);
 }

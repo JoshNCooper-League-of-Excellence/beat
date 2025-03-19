@@ -1,9 +1,587 @@
 import lexer::*;
 
-Parser :: struct {
+#region AST {
+  alias NodeID :: u32;
 
+  NodeTag :: enum {
+    Boolean,
+    Number,
+    String,
+    Identifier,
+    Binary,
+    Unary,
+    MemberAccess,
+    Subscript,
+
+    ObjectLiteral,
+    ArrayLiteral,
+
+    Block,
+    Function,
+
+    If,
+    Else,
+    While,
+    For,
+
+    Return,
+    Continue,
+    Break,
+
+    Variable,
+    Call,
+    TypeDeclaration,
+  }
+
+  Unary :: struct {
+    operand: NodeID,
+    operator: TType,
+  }
+
+  Binary :: struct {
+    left: NodeID,
+    right: NodeID,
+    operator: TType,
+  }
+
+  MemberAccess :: struct {
+    base: NodeID,
+    member: String,
+  }
+
+  Subscript :: struct {
+    base: NodeID,
+    index: NodeID,
+  }
+
+  Call :: struct {
+    callee: NodeID,
+    arguments: NodeID[]
+  }
+
+  ObjectLiteral :: struct {
+    key_values: Map!<String, NodeID>,
+  }
+
+  ArrayLiteral :: struct {
+    values: NodeID[],
+  }
+
+  Block :: struct {
+    statements: NodeID[],
+  }
+
+  Function :: struct {
+    name: String,
+    parameters: String[],
+    block: NodeID,
+  }
+
+  TypeDeclaration :: struct {
+    name: String,
+    members: Map!<String, Option!<NodeID>>,
+  }
+
+  If :: struct {
+    condition: NodeID,
+    block: NodeID,
+    else_node: Option!<NodeID>,
+  }
+
+  Else :: struct {
+    if_node: Option!<NodeID>,
+    block: Option!<NodeID>,
+  }
+
+  While :: struct {
+    condition: Option!<NodeID>,
+    block: NodeID,
+  }
+
+  For :: struct {
+    target: NodeID,
+    identifier: String,
+    block: NodeID,
+  }
+
+  Return :: struct {
+    expression: Option!<NodeID>
+  }
+
+  Variable :: struct {
+    name: String,
+    value: Option!<NodeID>,
+  }
+
+  Continue :: struct {}
+  Break    :: struct {}
+
+  Node :: struct {
+    tag: NodeTag,
+    #anon :: struct {
+      boolean: bool,
+      number: f64,
+      string: String,
+      identifier: String,
+      binary: Binary,
+      unary: Unary,
+
+      object_literal: ObjectLiteral,
+      array_literal: ArrayLiteral,
+      type_declaration: TypeDeclaration,
+
+      function: Function,
+      block: Block,
+
+      if_node: If,
+      else_node: Else,
+      for_node: For,
+      while_node: While,
+
+      return_node: Return,
+      continue_node: Continue,
+      break_node: Break,
+
+      call: Call,
+      member_access: MemberAccess,
+      variable: Variable,
+
+    },
+  }
 }
 
-Expr :: struct {
-  members: (Expr, Option!<TokenType>)[],
+Parser :: struct {
+  nodes: Node[],
+}
+
+Precedence :: enum {
+  Lowest,
+  Assignment,  // =
+  Conditional, // ?:
+  LogicalOr,   // ||
+  LogicalAnd,  // &&
+  BitwiseOr,   // |
+  BitwiseXor,  // ^
+  BitwiseAnd,  // &
+  Equality,    // == !=
+  Relational,  // < > <= >=
+  Shift,       // << >>
+  Additive,    // + -
+  Multiplicative, // * / %
+  Unary,       // ! - + ++ --
+  Postfix,     // [] . () -> ++ --
+  Highest
+}
+
+impl Precedence {
+  get :: fn(type: TType) -> #self {
+    if type == TType::Assign {
+      return Precedence::Assignment;
+    } else if type == TType::LT || type == TType::LTE || type == TType::GT || type == TType::GTE {
+      return Precedence::Relational;
+    } else if type == TType::EQ || type == TType::NEQ {
+      return Precedence::Equality;
+    } else if type == TType::Add || type == TType::Sub {
+      return Precedence::Additive;
+    } else if type == TType::Mul || type == TType::Div {
+      return Precedence::Multiplicative;
+    } else if type == TType::Not {
+      return Precedence::Unary;
+    } else if type == TType::Dot {
+      return Precedence::Postfix;
+    } else {
+      return Precedence::Lowest;
+    }
+  }
+}
+
+impl Parser {
+  new :: fn() -> #self {
+    return .{};
+  }
+
+  add_node :: fn(*mut self, node: Node) -> NodeID {
+    id := self.nodes.length as NodeID;
+    self.nodes.push(node);
+    return id;
+  }
+
+  parse_primary :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
+    token := lexer.peek();
+    switch token.type {
+      TType::OpenCurly: {  /* Object literal. */ }
+      TType::OpenBracket: { /* Array literal */ }
+      TType::Number: {
+        lexer.eat();
+        return self.add_node(.{
+          tag: NodeTag::Number,
+          number: atof(token.value.unwrap().data),
+        });
+      }
+      TType::True: {
+        lexer.eat();
+        return self.add_node(.{
+          tag: NodeTag::Boolean,
+          boolean: true,
+        });
+      }
+      TType::False: {
+        lexer.eat();
+        return self.add_node(.{
+          tag: NodeTag::Boolean,
+          boolean: false,
+        });
+      }
+      TType::String: {
+        lexer.eat();
+        return self.add_node(.{
+          tag: NodeTag::String,
+          string: token.value.unwrap(),
+        });
+      }
+      TType::Identifier: {
+        lexer.eat();
+        return self.add_node(.{
+          tag: NodeTag::Identifier,
+          identifier: token.value.unwrap(),
+        });
+      } 
+      else: {
+        panic("invalid primary expression");
+      }
+    }
+    return -1 as u32;
+  }
+
+  parse_postfix :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
+    mut node := self.parse_primary(lexer);
+    while {
+      token := lexer.peek();
+      switch token.type {
+        TType::OpenParen: {
+          lexer.eat();
+          mut arguments: NodeID[];
+
+          if lexer.peek().type != TType::CloseParen {
+            while {
+              arguments.push(self.parse_expression(lexer));
+              if lexer.peek().type == TType::CloseParen {
+                break;
+              }
+              lexer.expect(TType::Comma);
+            }
+          }
+
+          lexer.expect(TType::CloseParen);
+
+          node = self.add_node(.{
+            tag: NodeTag::Call,
+            call: .{
+              callee: node,
+              arguments: arguments,
+            },
+          });
+        }
+        TType::Dot: {
+          lexer.eat();
+          member := lexer.expect(TType::Identifier).unwrap().value.unwrap();
+          node = self.add_node(.{
+            tag: NodeTag::MemberAccess,
+            member_access: .{
+              base: node,
+              member: member,
+            },
+          });
+        }
+        else: { break; } 
+      }
+    }
+    return node;
+  }
+
+  parse_unary :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
+    token := lexer.peek();
+    if token.type == TType::Not || token.type == TType::Sub {
+      lexer.eat();
+      operand := self.parse_unary(lexer);
+      return self.add_node(.{
+        tag: NodeTag::Unary,
+        unary: .{
+          operand: operand,
+          operator: token.type,
+        },
+      });
+    }
+    return self.parse_primary(lexer);
+  }
+
+  parse_binary :: fn(*mut self, lexer: *mut Lexer, mut left: NodeID, precedence: Precedence) -> NodeID {
+    while {
+      token := lexer.peek();
+      token_precedence := Precedence::get(token.type);
+      if token_precedence <= precedence then break;
+
+      lexer.eat();
+      right := self.parse_expression_impl(lexer, token_precedence);
+      node := Node.{
+        tag: NodeTag::Binary,
+        binary: .{
+          left: left,
+          right: right,
+          operator: token.type,
+        },
+      };
+      left = self.add_node(node);
+    }
+    return left;
+  }
+
+  parse_expression_impl :: fn(*mut self, lexer: *mut Lexer, precedence: Precedence) -> NodeID {
+    left := self.parse_unary(lexer);
+    return self.parse_binary(lexer, left, precedence);
+  }
+
+  parse_expression :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
+    return self.parse_expression_impl(lexer, Precedence::Lowest);
+  }
+
+  parse_variable :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
+    lexer.expect(TType::Var).unwrap();
+    name := lexer.expect(TType::Identifier).unwrap().value.unwrap();
+
+    if lexer.peek().type == TType::Semi {
+      lexer.eat();
+      return self.add_node(.{
+        tag: NodeTag::Variable,
+        variable: .{
+          name: name,
+          value: None(),
+        }
+      });
+    } else {
+      lexer.expect(TType::Assign).unwrap();
+      return self.add_node(.{
+        tag: NodeTag::Variable,
+        variable: .{
+          name: name,
+          value: Some(self.parse_expression(lexer)),
+        }
+      });
+    }
+  }
+
+  parse_if :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
+    lexer.expect(TType::If).unwrap();
+    condition := self.parse_expression(lexer);
+    block := self.parse_block(lexer);
+
+    mut else_node: Option!<NodeID> = None();
+    if lexer.peek().type == TType::Else {
+      else_node = Some(self.parse_else(lexer));
+    }
+    
+    return self.add_node(.{
+      tag: NodeTag::If,
+      if_node: .{
+        condition: condition,
+        block: block,
+        else_node: else_node
+      }
+    });
+  }
+
+  parse_else :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
+    lexer.expect(TType::Else).unwrap();
+
+    if lexer.peek().type == TType::If {
+      if_node := Some(self.parse_if(lexer));
+      return self.add_node(.{
+        tag: NodeTag::Else,
+        else_node: .{
+          if_node: if_node,
+        }
+      });
+    } else {
+      block := Some(self.parse_block(lexer));
+      return self.add_node(.{
+        tag: NodeTag::Else,
+        else_node: .{
+          block: block,
+        }
+      });
+    }
+  }
+
+  parse_while :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
+    lexer.expect(TType::While).unwrap();
+    mut condition: Option!<NodeID> = None();
+    if lexer.peek().type != TType::OpenCurly {
+      condition = Some(self.parse_expression(lexer));
+    }
+    block := self.parse_block(lexer);
+    return self.add_node(.{
+      tag: NodeTag::While,
+      while_node: .{
+        condition: condition,
+        block: block
+      }
+    });
+  }
+
+  parse_for :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
+    lexer.expect(TType::For).unwrap();
+    identifier := lexer.expect(TType::Identifier).unwrap().value.unwrap();
+    lexer.expect(TType::In).unwrap();
+    target := self.parse_expression(lexer);
+    block := self.parse_block(lexer);
+
+    return self.add_node(.{
+      tag: NodeTag::For,
+      for_node: .{
+        identifier: identifier,
+        target: target,
+        block: block
+      }
+    });
+  }
+
+  parse_type :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
+    lexer.expect(TType::Type).unwrap();
+    name := lexer.expect(TType::Identifier).unwrap().value.unwrap();
+    lexer.expect(TType::Assign).unwrap();
+    lexer.expect(TType::OpenCurly).unwrap();
+    mut key_values: Map!<String, Option!<NodeID>>;
+    while lexer.peek().type == TType::Identifier {
+      key := lexer.eat().unwrap().value.unwrap();
+      mut value: Option!<NodeID> = None();
+      if lexer.peek().type == TType::Assign {
+        value = Some(self.parse_expression(lexer));
+      } 
+      if lexer.peek().type != TType::CloseCurly {
+        lexer.expect(TType::Comma).unwrap();
+      } else {
+        lexer.eat();
+        break;
+      }
+      key_values.insert(key, value);
+    }
+    return self.add_node(.{
+      tag: NodeTag::TypeDeclaration,
+      type_declaration: .{
+        name: name,
+        members: key_values,
+      }
+    });
+  }
+
+  parse_block :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
+    lexer.expect(TType::OpenCurly).unwrap();
+    mut statements: NodeID[];
+    while lexer.peek().type != TType::CloseCurly {
+      statements.push(self.parse_statement(lexer));
+    }
+    lexer.expect(TType::CloseCurly).unwrap();
+    return self.add_node(.{
+      tag: NodeTag::Block,
+      block: .{
+        statements: statements,
+      }
+    });
+  }
+
+  parse_function :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
+    lexer.expect(TType::Fn).unwrap();
+    name := lexer.expect(TType::Identifier).unwrap().value.unwrap();
+    lexer.expect(TType::OpenParen).unwrap();
+    mut parameters: String[];
+    if lexer.peek().type != TType::CloseParen {
+      while {
+        parameters.push(lexer.expect(TType::Identifier).unwrap().value.unwrap());
+        if lexer.peek().type == TType::CloseParen {
+          break;
+        }
+        lexer.expect(TType::Comma).unwrap();
+      }
+    }
+    lexer.expect(TType::CloseParen).unwrap();
+    block := self.parse_block(lexer);
+    return self.add_node(.{
+      tag: NodeTag::Function,
+      function: .{
+      name: name,
+      parameters: parameters,
+      block: block,
+      }
+    });
+  }
+
+  parse_statement :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
+    token := lexer.peek();
+    switch token.type {
+      TType::Var: {
+        return self.parse_variable(lexer);
+      }
+      TType::If: {
+        return self.parse_if(lexer);
+      }
+      TType::While: {
+        return self.parse_while(lexer);
+      }
+      TType::For: {
+        return self.parse_for(lexer);
+      }
+      TType::Type: {
+        return self.parse_type(lexer);
+      }
+      TType::Fn: {
+        return self.parse_function(lexer);
+      }
+      TType::Return: {
+        lexer.eat();
+        mut expression: Option!<NodeID> = None();
+        if lexer.peek().type != TType::Semi {
+          expression = Some(self.parse_expression(lexer));
+        }
+        lexer.expect(TType::Semi).unwrap();
+        return self.add_node(.{
+          tag: NodeTag::Return,
+          return_node: .{
+          expression: expression,
+          }
+        });
+      }
+      TType::Continue: {
+        lexer.eat();
+        lexer.expect(TType::Semi).unwrap();
+        return self.add_node(.{
+          tag: NodeTag::Continue,
+          continue_node: .{},
+        });
+      }
+      TType::Break: {
+        lexer.eat();
+        lexer.expect(TType::Semi).unwrap();
+        return self.add_node(.{
+          tag: NodeTag::Break,
+          break_node: .{},
+        });
+      }
+      else: {
+        node := self.parse_expression(lexer);
+        lexer.expect(TType::Semi).unwrap();
+        return node;
+      }
+    }
+    panic("invalid statement");
+    return -1 as u32;
+  }
+
+  parse :: fn(*mut self, lexer: *mut Lexer) -> Node[] {
+    while {
+      token := lexer.peek();
+      if token.type == TType::Eof then break;
+      self.parse_statement(lexer);
+    }
+    return self.nodes;
+  }
 }
