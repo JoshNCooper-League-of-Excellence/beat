@@ -10,12 +10,6 @@ impl Parser {
   new :: fn() -> #self {
     return .{
       arena: Arena::new(8192, ArenaFlags::Align),
-      parent: new(Node.{
-        tag: NodeTag::Block,
-        block: .{
-          scope: new(Scope.{}),
-        }
-      })
     };
   }
 
@@ -29,6 +23,24 @@ impl Parser {
   parse_primary :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
     token := lexer.peek();
     switch token.type {
+      TType::Fn: {
+        lexer.eat();
+        node := self.new_node(Node.{
+          tag: NodeTag::Lambda,
+          lambda: .{}
+        });
+
+        lambda := &mut node.lambda;
+
+        lexer.expect(TType::OpenParen).unwrap();
+        while lexer.peek().type != TType::CloseParen {
+          lambda.parameters.push(lexer.expect(TType::Identifier).unwrap().value.unwrap());
+        }
+        lexer.expect(TType::CloseParen).unwrap();
+        lambda.block = self.parse_block(lexer);
+
+        return node;
+      }
       TType::OpenCurly: {
         lexer.eat();
         mut values: Map!<String, *mut Node>;
@@ -209,8 +221,7 @@ impl Parser {
   }
 
   parse_expression_impl :: fn(*mut self, lexer: *mut Lexer, precedence: Precedence) -> *mut Node {
-    left := self.parse_unary(lexer);
-    return self.parse_binary(lexer, left, precedence);
+    return self.parse_binary(lexer, self.parse_unary(lexer), precedence);
   }
 
   parse_expression :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
@@ -330,10 +341,15 @@ impl Parser {
       block: .{},
     });
 
-    self.parent = node;
-
     block := &mut node.block;
     block.scope = scope;
+
+    old_parent := self.parent;
+    self.parent = node;
+
+    defer {
+      self.parent = old_parent;
+    }
 
 
     while lexer.peek().type != TType::CloseCurly {

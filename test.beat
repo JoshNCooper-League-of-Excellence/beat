@@ -1,0 +1,13 @@
+fn main() {
+  var value = 0.0;
+  
+  var funcy = fn() { 
+    return range(0, 10); 
+  };
+
+  var result = funcy();
+  
+  print(result);
+}
+
+main();

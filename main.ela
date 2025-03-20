@@ -3,11 +3,10 @@ import lexer::*;
 import parser::*;
 import interp::*;
 
-main :: fn() {
-  mut lexer := Lexer::new("test.shela".as_string());
-  mut parser := Parser::new();
-  mut root := parser.parse(&mut lexer);
+#c_flags " -lm "
+#foreign fmod :: fn(a: f64, b: f64) -> s32;
 
+bootstrap_builtin_functions :: fn(root: *mut Node) {
   root.block.scope.insert("print".as_string(), Rc!<Value>::new(Value.{
     tag: ValueTag::NativeFunction,
     native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
@@ -21,6 +20,22 @@ main :: fn() {
       println(string);
       string.deinit();
       builder.deinit();
+    }
+  }));
+
+  root.block.scope.insert("mod".as_string(), Rc!<Value>::new(Value.{
+    tag: ValueTag::NativeFunction,
+    native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
+      if args.length != 2 {
+        return Value::None();
+      }
+      a := args[0].ptr.number;
+      b := args[1].ptr.number;
+      result := fmod(a as f32, b as f32);
+      return Rc!<Value>::new(Value.{
+        tag: ValueTag::Number,
+        number: result,
+      });
     }
   }));
 
@@ -50,6 +65,23 @@ main :: fn() {
       });
     }
   }));
+}
+
+main :: fn() {
+  args := Env::args();
+  mut path: String;
+  if args.length >= 2 {
+    path = String::from(args[1]);
+  } else {
+    printf("too few arguments!\nusage: beat <filename.beat>"c);
+    return;
+  }
+
+  mut lexer := Lexer::new(path);
+  mut parser := Parser::new();
+  mut root := parser.parse(&mut lexer);
+
+  bootstrap_builtin_functions(root);
 
   mut interp: Interp;
   interp.run(root);

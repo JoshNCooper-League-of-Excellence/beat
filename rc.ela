@@ -3,22 +3,25 @@ Rc :: struct!<T> {
   rc: *mut u64,
 }
 
-impl!<T> Deinit for Rc!<T> {
-  deinit :: fn(*mut self) {
-    *self.rc -= 1;
-    if *self.rc <= 0 {
-      free(self.ptr);
-      free(self.rc);
+impl!<T> Rc!<T> {
+  // this hack to aleviate annoyances.
+  deinit :: fn(*const self) {
+    mut_self := self as *mut #self;
+    *mut_self.rc -= 1;
+    if *mut_self.rc <= 0 {
+      free(mut_self.ptr);
+      free(mut_self.rc);
     }
   }
 }
 
-impl!<T> Clone for Rc!<T> {
-  clone :: fn(self) -> #self {
-    *self.rc += 1;
+impl!<T> Rc!<T> {
+  clone :: fn(*const self) -> #self {
+    mut_self := self as *mut #self;
+    *mut_self.rc += 1;
     return .{
-      ptr: self.ptr,
-      rc: self.rc,
+      ptr: mut_self.ptr,
+      rc: mut_self.rc,
     }
   }
 }
@@ -30,6 +33,13 @@ impl!<T> Rc!<T> {
       rc:   new(1 as u64),
     }
   }
+  
+  from :: fn(value: *mut T) -> #self {
+    return .{
+      ptr: value,
+      rc: new(1 as u64),
+    };
+  }
 
   empty :: fn() -> #self {
     return .{
@@ -38,12 +48,13 @@ impl!<T> Rc!<T> {
     }
   }
 
-  // it seems weird, but we just pass the pointer out,
-  // the one we want dereference.
-  // this allows the compiler to dereference it, and this allows us
-  // to assign via this pointer, instead of always just getting a value.
+  /* 
+    it seems weird, but we just pass the pointer out,
+    the one we want dereference.
+    this allows the compiler to dereference it, and this allows us
+    to assign via this pointer, instead of always just getting a value.
+  */
   deref :: fn(self) -> *mut T {
     return self.ptr;
   }
-  
 }

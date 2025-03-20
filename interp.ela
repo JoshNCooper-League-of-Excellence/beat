@@ -1,21 +1,5 @@
 import parser::*;
 
-impl!<T> T[] {
-  reverse :: fn(*mut self) {
-    len := self.length;
-
-    if len <= 1 then return;
-
-    for i in 0..(len / 2) {
-      high := len - 1 - i;
-      low := i;
-      temp := self.data[low];
-      self.data[low] = self.data[high];
-      self.data[high] = temp;
-    }
-  }
-}
-
 Interp :: struct {}
 
 ControlFlow :: enum {
@@ -295,9 +279,6 @@ impl Interp {
     block := &mut node.block;
     mut cf: ControlFlow = ControlFlow::None;
 
-    old_scope := node.parent.block.scope;
-    node.parent.block.scope = block.scope;
-    defer node.parent.block.scope = old_scope;
 
     for statement in node.block.statements {
       result := self.visit_statement(statement);
@@ -321,7 +302,6 @@ impl Interp {
     } else {
       node.parent.block.scope.insert(variable_name, Value::None());
     }
-
     return .{
       control_flow: ControlFlow::None,
       value: None(),
@@ -358,6 +338,15 @@ impl Interp {
 
   visit_expression :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
     switch node.tag {
+      NodeTag::Lambda: {
+        function: *mut Function = new(Function.{});
+        function.block = node.lambda.block;
+        function.parameters = node.lambda.parameters;
+        return Rc!<Value>::new(Value.{
+          tag: ValueTag::Function,
+          function: function,
+        });
+      }
       NodeTag::Boolean: {
         return Rc!<Value>::new(Value.{
           tag: ValueTag::Boolean,

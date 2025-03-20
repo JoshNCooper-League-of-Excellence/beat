@@ -202,6 +202,11 @@ Function :: struct {
   block: *mut Node,
 }
 
+Lambda :: struct {
+  parameters: String[],
+  block: *mut Node,
+}
+
 If :: struct {
   condition: *mut Node,
   block: *mut Node,
@@ -261,6 +266,7 @@ NodeTag :: enum {
 
   Variable,
   Call,
+  Lambda,
 }
 
 Node :: struct {
@@ -278,6 +284,7 @@ Node :: struct {
     array_literal: ArrayLiteral,
 
     function: Function,
+    lambda: Lambda,
     block: Block,
 
     if_node: If,
