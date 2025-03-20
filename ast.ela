@@ -329,155 +329,154 @@ impl Format for Value {
   }
 }
 
+impl Rc!<Value> {
+  eq :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+    if self.ptr.tag != other.ptr.tag {
+      return Value::False();
+    } 
 
-
-impl Eq for Value {
-  eq :: fn(self, other: #self) -> bool {
-    if self.tag != other.tag {
-      return false;
-    }
-    switch self.tag {
-      ValueTag::None: {
-        return true;
-      }
-      ValueTag::Number: {
-        return self.number == other.number;
-      }
-      ValueTag::String: {
-        return self.string == other.string;
-      }
-      ValueTag::Boolean: {
-        return self.boolean == other.boolean;
-      }
+    switch self.ptr.tag {
+      ValueTag::None => Value::True(),
+      ValueTag::Number => Value::Bool(self.ptr.number == other.ptr.number),
+      ValueTag::String => Value::Bool(self.ptr.string == other.ptr.string),
+      ValueTag::Boolean => Value::Bool(self.ptr.boolean == other.ptr.boolean),
       ValueTag::Object: {
-        if self.object.length != other.object.length {
-          return false;
-        }
-        for key, value in self.object {
-          if !other.object.contains(key) || !(*value).eq(*other.object.get(key).unwrap()) {
-            return false;
+        if self.ptr.object.length != other.ptr.object.length {
+          return Value::False();
+        } else {
+          for key, value in self.ptr.object {
+            if !other.ptr.object.contains(key) {
+              return Value::False();
+            }
+            other_value := other.ptr.object.get(key).unwrap();
+            if !value.eq(other_value).ptr.boolean {
+              return Value::False();
+            }
           }
+          return Value::True();
         }
-        return true;
       }
       ValueTag::Array: {
-        if self.array.length != other.array.length {
-          return false;
-        }
-        for i in 0..self.array.length {
-          if !(*self.array[i]).eq(*other.array[i]) {
-            return false;
+        if self.ptr.array.length != other.ptr.array.length {
+          return Value::False();
+        } else {
+          for i in 0..self.ptr.array.length {
+            if !self.ptr.array[i].eq(other.ptr.array[i]).ptr.boolean {
+              return Value::False();
+            }
           }
+          return Value::True();
         }
-        return true;
       }
-      ValueTag::Function: {
-        return self.function == other.function;
-      }
-      ValueTag::NativeFunction: {
-        return self.native_function == other.native_function;
-      }
+      ValueTag::Function => Value::Bool(self.ptr.function == other.ptr.function),
+      ValueTag::NativeFunction => Value::Bool(self.ptr.native_function == other.ptr.native_function),
     }
-    return false;
+    return Value::False();
   }
-  neq :: fn(self, other: #self) -> bool {
-    return !self.eq(other);
+  neq :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+    return Value::Bool(!self.eq(other).ptr.boolean);
   }
 }
 
-impl Value {
-  add :: fn(self, other: #self) -> Rc!<Value> {
-    if self.tag == ValueTag::Number && other.tag == ValueTag::Number {
+impl Rc!<Value> {
+  add :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+    if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
         tag: ValueTag::Number,
-        number: self.number + other.number,
+        number: self.ptr.number + other.ptr.number,
       });
-    } else if self.tag == ValueTag::String && other.tag == ValueTag::String {
-      new_string := format("%%", (self.string, other.string), FormatOptions::default());
+    } else if self.ptr.tag == ValueTag::String {
+      mut builder: StringBuilder;
+      builder.append(self.ptr.string);
+      other.ptr.format(&mut builder, FormatOptions::default());
+      string := builder.get_string();
+      builder.deinit();
       return Rc!<Value>::new(Value.{
         tag: ValueTag::String,
-        string: new_string,
+        string: string,
       });
-    } else {
-      panic("addition is only supported for numbers and strings");
-      return .{};
+    } else if self.ptr.tag == ValueTag::Array {
+      self.ptr.array.push(other);
+      return self;
     }
+
+    return Value::None();
   }
-  sub :: fn(self, other: #self) -> Rc!<Value> {
-    if self.tag == ValueTag::Number && other.tag == ValueTag::Number {
+  sub :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+    if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
         tag: ValueTag::Number,
-        number: self.number - other.number,
+        number: self.ptr.number - other.ptr.number,
       });
     } else {
       panic("subtraction is only supported for numbers");
-      return .{};
+      return Value::None();
     }
   }
-  mul :: fn(self, other: #self) -> Rc!<Value> {
-    if self.tag == ValueTag::Number && other.tag == ValueTag::Number {
+  mul :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+    if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
         tag: ValueTag::Number,
-        number: self.number * other.number,
+        number: self.ptr.number * other.ptr.number,
       });
     } else {
       panic("multiplication is only supported for numbers");
-      return .{};
+      return Value::None();
     }
   }
-  div :: fn(self, other: #self) -> Rc!<Value> {
-    if self.tag == ValueTag::Number && other.tag == ValueTag::Number {
+  div :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+    if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
         tag: ValueTag::Number,
-        number: self.number / other.number,
+        number: self.ptr.number / other.ptr.number,
       });
     } else {
       panic("division is only supported for numbers");
-      return .{};
+      return Value::None();
     }
   }
-  lt :: fn(self, other: #self) -> Rc!<Value> {
-    if self.tag == ValueTag::Number && other.tag == ValueTag::Number {
+  lt :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+    if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
         tag: ValueTag::Boolean,
-        boolean: self.number < other.number,
+        boolean: self.ptr.number < other.ptr.number,
       });
     } else {
       panic("less than comparison is only supported for numbers");
-      return .{};
+      return Value::None();
     }
   }
-  lte :: fn(self, other: #self) -> Rc!<Value> {
-    if self.tag == ValueTag::Number && other.tag == ValueTag::Number {
+  lte :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+    if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
         tag: ValueTag::Boolean,
-        boolean: self.number <= other.number,
+        boolean: self.ptr.number <= other.ptr.number,
       });
     } else {
       panic("less than or equal comparison is only supported for numbers");
-      return .{};
+      return Value::None();
     }
   }
-  gt :: fn(self, other: #self) -> Rc!<Value> {
-    if self.tag == ValueTag::Number && other.tag == ValueTag::Number {
+  gt :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+    if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
         tag: ValueTag::Boolean,
-        boolean: self.number > other.number,
+        boolean: self.ptr.number > other.ptr.number,
       });
     } else {
       panic("greater than comparison is only supported for numbers");
-      return .{};
+      return Value::None();
     }
   }
-  gte :: fn(self, other: #self) -> Rc!<Value> {
-    if self.tag == ValueTag::Number && other.tag == ValueTag::Number {
+  gte :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+    if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
         tag: ValueTag::Boolean,
-        boolean: self.number >= other.number,
+        boolean: self.ptr.number >= other.ptr.number,
       });
     } else {
       panic("greater than or equal comparison is only supported for numbers");
-      return .{};
+      return Value::None();
     }
   }
 }

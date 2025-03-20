@@ -62,49 +62,54 @@ impl Interp {
   visit_binary :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
     switch node.binary.operator {
       TType::Add: {
-        return 
-          (*self.visit_expression(self.get_node(node.binary.left))) +
-          (*self.visit_expression(self.get_node(node.binary.right)));
+        return self.visit_expression(self.get_node(node.binary.left)).add(
+          self.visit_expression(self.get_node(node.binary.right)),
+        );
       }
       TType::Sub: {
-        return (*self.visit_expression(self.get_node(node.binary.left))) -
-          (*self.visit_expression(self.get_node(node.binary.right)));
+        return self.visit_expression(self.get_node(node.binary.left)).sub(
+          self.visit_expression(self.get_node(node.binary.right)),
+        );
       }
       TType::Mul: {
-        return (*self.visit_expression(self.get_node(node.binary.left))) *
-          (*self.visit_expression(self.get_node(node.binary.right)));
+        return self.visit_expression(self.get_node(node.binary.left)).mul(
+          self.visit_expression(self.get_node(node.binary.right)),
+        );
       }
       TType::Div: {
-        return (*self.visit_expression(self.get_node(node.binary.left))) /
-          (*self.visit_expression(self.get_node(node.binary.right)));
+        return self.visit_expression(self.get_node(node.binary.left)).div(
+          self.visit_expression(self.get_node(node.binary.right)),
+        );
       }
       TType::LT: {
-        return (*self.visit_expression(self.get_node(node.binary.left))) <
-          (*self.visit_expression(self.get_node(node.binary.right)));
+        return self.visit_expression(self.get_node(node.binary.left)).div(
+          self.visit_expression(self.get_node(node.binary.right))
+        );
       }
       TType::LTE: {
-        return self.visit_expression(self.get_node(node.binary.left)).ptr.lte(
-          *self.visit_expression(self.get_node(node.binary.right))
+        return self.visit_expression(self.get_node(node.binary.left)).lte(
+          self.visit_expression(self.get_node(node.binary.right))
         );
       }
       TType::GT: {
-        return (*self.visit_expression(self.get_node(node.binary.left))) >
-          (*self.visit_expression(self.get_node(node.binary.right)));
+        return self.visit_expression(self.get_node(node.binary.left)).gt(
+          self.visit_expression(self.get_node(node.binary.right)),
+        );
       }
       TType::GTE: {
-        return self.visit_expression(self.get_node(node.binary.left)).ptr.lte(
-          *self.visit_expression(self.get_node(node.binary.right))
+        return self.visit_expression(self.get_node(node.binary.left)).lte(
+          self.visit_expression(self.get_node(node.binary.right))
         );
       }
       TType::EQ: {
-        return Value::Bool(self.visit_expression(self.get_node(node.binary.left)).ptr.eq(
-          *self.visit_expression(self.get_node(node.binary.right))
-        ));
+        return self.visit_expression(self.get_node(node.binary.left)).eq(
+          self.visit_expression(self.get_node(node.binary.right))
+        );
       }
       TType::NEQ: {
-        return Value::Bool(self.visit_expression(self.get_node(node.binary.left)).ptr.neq(
-          *self.visit_expression(self.get_node(node.binary.right)),
-        ));
+        return self.visit_expression(self.get_node(node.binary.left)).neq(
+          self.visit_expression(self.get_node(node.binary.right)),
+        );
       }
       TType::Assign: {
         mut left := self.visit_expression(self.get_node(node.binary.left));
