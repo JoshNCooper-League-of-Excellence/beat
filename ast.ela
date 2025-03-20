@@ -3,8 +3,6 @@ import lexer::*;
 import rc::*;
 import map::Map;
 
-alias NodeID :: u32;
-
 ValueTag :: enum {
   None,
   Number,
@@ -115,43 +113,45 @@ impl Scope {
   }
 }
 
+Node :: struct;
+
 Unary :: struct {
-  operand: NodeID,
+  operand: *mut Node,
   operator: TType,
 }
 
 Binary :: struct {
-  left: NodeID,
-  right: NodeID,
+  left: *mut Node,
+  right: *mut Node,
   operator: TType,
 }
 
 MemberAccess :: struct {
-  base: NodeID,
+  base: *mut Node,
   member: String,
 }
 
 Subscript :: struct {
-  base: NodeID,
-  index: NodeID,
+  base: *mut Node,
+  index: *mut Node,
 }
 
 Call :: struct {
-  callee: NodeID,
-  arguments: NodeID[]
+  callee: *mut Node,
+  arguments: List!<*mut Node>
 }
 
 ObjectLiteral :: struct {
-  key_values: Map!<String, NodeID>,
+  key_values: Map!<String, *mut Node>,
 }
 
 ArrayLiteral :: struct {
-  values: NodeID[],
+  values: List!<*mut Node>,
 }
 
 Block :: struct {
   scope: *mut Scope,
-  statements: Node[],
+  statements: List!<*mut Node>,
 }
 
 Function :: struct {
@@ -160,40 +160,35 @@ Function :: struct {
   block: Block,
 }
 
-TypeDeclaration :: struct {
-  name: String,
-  members: Map!<String, Option!<NodeID>>,
-}
-
 If :: struct {
-  condition: NodeID,
-  block: NodeID,
-  else_node: Option!<NodeID>,
+  condition: *mut Node,
+  block: *mut Node,
+  else_node: Option!<*mut Node>,
 }
 
 Else :: struct {
-  if_node: Option!<NodeID>,
-  block: Option!<NodeID>,
+  if_node: Option!<*mut Node>,
+  block: Option!<*mut Node>,
 }
 
 While :: struct {
-  condition: Option!<NodeID>,
-  block: NodeID,
+  condition: Option!<*mut Node>,
+  block: *mut Node,
 }
 
 For :: struct {
-  target: NodeID,
+  target: *mut Node,
   identifier: String,
-  block: NodeID,
+  block: *mut Node,
 }
 
 Return :: struct {
-  expression: Option!<NodeID>
+  expression: Option!<*mut Node>
 }
 
 Variable :: struct {
   name: String,
-  value: Option!<NodeID>,
+  value: Option!<*mut Node>,
 }
 
 NodeTag :: enum {
@@ -228,7 +223,6 @@ NodeTag :: enum {
 
 Node :: struct {
   tag: NodeTag,
-  id: NodeID,
   #anon :: union {
     boolean: bool,
     number: f64,
