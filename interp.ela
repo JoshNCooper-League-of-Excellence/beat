@@ -67,111 +67,44 @@ impl Interp {
           (*self.visit_expression(self.get_node(node.binary.right)));
       }
       TType::Sub: {
-        left := *self.visit_expression(self.get_node(node.binary.left));
-        right := *self.visit_expression(self.get_node(node.binary.right));
-        if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
-          return Rc!<Value>::new(Value.{
-            tag: ValueTag::Number,
-            number: left.number - right.number,
-          });
-        } else {
-          panic("subtraction is only supported for numbers");
-          return .{};
-        }
+        return (*self.visit_expression(self.get_node(node.binary.left))) -
+          (*self.visit_expression(self.get_node(node.binary.right)));
       }
       TType::Mul: {
-        left := *self.visit_expression(self.get_node(node.binary.left));
-        right := *self.visit_expression(self.get_node(node.binary.right));
-        if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
-          return Rc!<Value>::new(Value.{
-            tag: ValueTag::Number,
-            number: left.number * right.number,
-          });
-        } else {
-          panic("multiplication is only supported for numbers");
-          return .{};
-        }
+        return (*self.visit_expression(self.get_node(node.binary.left))) *
+          (*self.visit_expression(self.get_node(node.binary.right)));
       }
       TType::Div: {
-        left := *self.visit_expression(self.get_node(node.binary.left));
-        right := *self.visit_expression(self.get_node(node.binary.right));
-        if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
-          return Rc!<Value>::new(Value.{
-            tag: ValueTag::Number,
-            number: left.number / right.number,
-          });
-        } else {
-          panic("division is only supported for numbers");
-          return .{};
-        }
+        return (*self.visit_expression(self.get_node(node.binary.left))) /
+          (*self.visit_expression(self.get_node(node.binary.right)));
       }
       TType::LT: {
-        left := *self.visit_expression(self.get_node(node.binary.left));
-        right := *self.visit_expression(self.get_node(node.binary.right));
-        if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
-          return Rc!<Value>::new(Value.{
-            tag: ValueTag::Boolean,
-            boolean: left.number < right.number,
-          });
-        } else {
-          panic("less than comparison is only supported for numbers");
-          return .{};
-        }
+        return (*self.visit_expression(self.get_node(node.binary.left))) <
+          (*self.visit_expression(self.get_node(node.binary.right)));
       }
       TType::LTE: {
-        left := *self.visit_expression(self.get_node(node.binary.left));
-        right := *self.visit_expression(self.get_node(node.binary.right));
-        if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
-          return Rc!<Value>::new(Value.{
-            tag: ValueTag::Boolean,
-            boolean: left.number <= right.number,
-          });
-        } else {
-          panic("less than or equal comparison is only supported for numbers");
-          return .{};
-        }
+        return self.visit_expression(self.get_node(node.binary.left)).ptr.lte(
+          *self.visit_expression(self.get_node(node.binary.right))
+        );
       }
       TType::GT: {
-        left := *self.visit_expression(self.get_node(node.binary.left));
-        right := *self.visit_expression(self.get_node(node.binary.right));
-        if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
-          return Rc!<Value>::new(Value.{
-            tag: ValueTag::Boolean,
-            boolean: left.number > right.number,
-          });
-        } else {
-          panic("greater than comparison is only supported for numbers");
-          return .{};
-        }
+        return (*self.visit_expression(self.get_node(node.binary.left))) >
+          (*self.visit_expression(self.get_node(node.binary.right)));
       }
       TType::GTE: {
-        left := *self.visit_expression(self.get_node(node.binary.left));
-        right := *self.visit_expression(self.get_node(node.binary.right));
-        if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
-          return Rc!<Value>::new(Value.{
-            tag: ValueTag::Boolean,
-            boolean: left.number >= right.number,
-          });
-        } else {
-          panic("greater than or equal comparison is only supported for numbers");
-          return .{};
-        }
+        return self.visit_expression(self.get_node(node.binary.left)).ptr.lte(
+          *self.visit_expression(self.get_node(node.binary.right))
+        );
       }
       TType::EQ: {
-        left := *self.visit_expression(self.get_node(node.binary.left));
-        right := *self.visit_expression(self.get_node(node.binary.right));
-        return Rc!<Value>::new(Value.{
-          tag: ValueTag::Boolean,
-          boolean: left == right,
-        });
+        return Value::Bool(self.visit_expression(self.get_node(node.binary.left)).ptr.eq(
+          *self.visit_expression(self.get_node(node.binary.right))
+        ));
       }
       TType::NEQ: {
-        left := *self.visit_expression(self.get_node(node.binary.left));
-        right := *self.visit_expression(self.get_node(node.binary.right));
-        return Rc!<Value>::new(Value.{
-          tag: ValueTag::Boolean,
-          boolean: left != right,
-        });
+        return Value::Bool(self.visit_expression(self.get_node(node.binary.left)).ptr.neq(
+          *self.visit_expression(self.get_node(node.binary.right)),
+        ));
       }
       TType::Assign: {
         mut left := self.visit_expression(self.get_node(node.binary.left));

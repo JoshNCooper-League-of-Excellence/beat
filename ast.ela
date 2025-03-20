@@ -40,6 +40,40 @@ impl Value {
     }
     return none;
   }
+
+  True :: fn() -> Rc!<#self> {
+    return Rc!<Value>::new(Value.{
+      tag: ValueTag::Boolean,
+      boolean: true,
+    });
+  }
+
+  False :: fn() -> Rc!<#self> {
+    return Rc!<Value>::new(Value.{
+      tag: ValueTag::Boolean,
+      boolean: false,
+    });
+  }
+
+  Bool :: fn(value: bool) -> Rc!<#self> {
+    return Rc!<Value>::new(Value.{
+      tag: ValueTag::Boolean,
+      boolean: value,
+    });
+  }
+
+  is_truthy :: fn(self) -> bool {
+    return switch self.tag {
+      ValueTag::None => false,
+      ValueTag::Number => self.number != 0.0,
+      ValueTag::String => self.string.length != 0,
+      ValueTag::Boolean => self.boolean,
+      ValueTag::Object => self.object.length != 0,
+      ValueTag::Array => self.array.length != 0,
+      ValueTag::Function => true,
+      ValueTag::NativeFunction => true,
+    };
+  }
 }
 
 Scope :: struct {
