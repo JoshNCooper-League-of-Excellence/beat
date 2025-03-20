@@ -72,16 +72,68 @@ impl Interp {
     return .{}
   }
   visit_member_access :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    return .{}
+    object := *self.visit_expression(self.get_node(node.member_access.base));
+    if object.tag != ValueTag::Object {
+      panic("cannot access member of a non-object");
+      return .{};
+    }
+
+    member := node.member_access.member;
+    value := object.object.get(member);
+    if value.is_none() {
+      panic("member not found in object");
+      return .{};
+    }
+
+    return value.unwrap().clone();
   }
+
   visit_subscript :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    return .{}
+    array := *self.visit_expression(self.get_node(node.subscript.base));
+    if array.tag != ValueTag::Array {
+      panic("cannot subscript a non-array");
+      return .{};
+    }
+
+    index := *self.visit_expression(self.get_node(node.subscript.index));
+    if index.tag != ValueTag::Number {
+      panic("array index must be a number");
+      return .{};
+    }
+
+    idx := index.number as u64;
+    if idx >= array.array.length {
+      panic("array index out of bounds");
+      return .{};
+    }
+
+    return array.array[idx].clone();
   }
   visit_object_literal :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    return .{}
+    mut object: Map!<String, Rc!<Value>>;
+
+    for key, value_node in node.object_literal.key_values {
+      value := self.visit_expression(self.get_node(value_node));
+      object.insert(key, value);
+    }
+
+    return Rc!<Value>::new(Value.{
+      tag: ValueTag::Object,
+      object: object,
+    });
   }
   visit_array_literal :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    return .{}
+    mut array: List!<Rc!<Value>>;
+
+    for element_node in node.array_literal.values {
+      value := self.visit_expression(self.get_node(element_node));
+      array.push(value);
+    }
+
+    return Rc!<Value>::new(Value.{
+      tag: ValueTag::Array,
+      array: array,
+    });
   }
 
   visit_block :: fn(*mut self, node: *mut Node) -> StatementResult {
@@ -304,7 +356,7 @@ impl Interp {
       if visited_indices.contains(i, fn(a: u32, b: u32) -> bool {
         return a == b;
       }) then continue;
-      
+
       node := &mut self.nodes[i];
       self.visit_statement(node);
     }

@@ -219,7 +219,7 @@ Node :: struct {
     call: Call,
     member_access: MemberAccess,
     variable: Variable,
-
+    subscript: Subscript,
   },
 }
 
@@ -239,7 +239,7 @@ impl Format for Value {
         builder.appendf("%", (self.boolean,), options);
       }
       ValueTag::Object: {
-        builder.append("{");
+        builder.append("{ ");
         if options.indented {
           builder.append("\n  ");
         }
@@ -249,13 +249,15 @@ impl Format for Value {
           (*value).format(builder, options);
           if options.indented && index != self.object.length - 1 {
             builder.append(",\n  ");
+          } else if index != self.object.length - 1 {
+            builder.append(", ");
           }
           index++;
         }
         if options.indented {
           builder.append("\n");
         }
-        builder.append("}");
+        builder.append(" }");
       }
       ValueTag::Array: {
         builder.append("[");
@@ -264,8 +266,10 @@ impl Format for Value {
         mut index := 0;
         for value in self.array {
           (*value).format(builder, options);;
-          if options.indented && index != self.object.length - 1 {
+          if options.indented && index != self.array.length - 1 {
             builder.append(",\n  ");
+          } else if index != self.array.length - 1 {
+            builder.append(", ");
           }
           index++;
         }
