@@ -6,10 +6,9 @@ import interp::*;
 main :: fn() {
   mut lexer := Lexer::new("test.shela".as_string());
   mut parser := Parser::new();
-  mut nodes := parser.parse(&mut lexer);
-  mut interp := Interp::new(parser.scope, nodes);
+  mut root := parser.parse(&mut lexer);
 
-  parser.scope.insert("print".as_string(), Rc!<Value>::new(Value.{
+  root.block.scope.insert("print".as_string(), Rc!<Value>::new(Value.{
     tag: ValueTag::NativeFunction,
     native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
       mut builder: StringBuilder;
@@ -25,7 +24,7 @@ main :: fn() {
     }
   }));
 
-  parser.scope.insert("range".as_string(), Rc!<Value>::new(Value.{
+  root.block.scope.insert("range".as_string(), Rc!<Value>::new(Value.{
     tag: ValueTag::NativeFunction,
     native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
       if args.length < 2 {
@@ -52,5 +51,6 @@ main :: fn() {
     }
   }));
 
-  interp.run();
+  mut interp: Interp;
+  interp.run(root);
 }

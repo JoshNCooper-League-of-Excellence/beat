@@ -16,10 +16,7 @@ impl!<T> T[] {
   }
 }
 
-Interp :: struct {
-  scope: *mut Scope,
-  nodes: List!<*mut Node>,
-}
+Interp :: struct {}
 
 ControlFlow :: enum {
   None,
@@ -34,13 +31,6 @@ StatementResult :: struct {
 }
 
 impl Interp {
-  new :: fn(scope: *mut Scope, mut nodes: List!<*mut Node>) -> #self {
-    return .{
-      scope: scope,
-      nodes: nodes,
-    };
-  }
-
   visit_if :: fn(*mut self, node: *mut Node) -> StatementResult {
     condition := *self.visit_expression(node.if_node.condition);
     if condition.is_truthy() {
@@ -67,13 +57,15 @@ impl Interp {
   }
 
   visit_while :: fn(*mut self, node: *mut Node) -> StatementResult {
-    old_scope := self.scope;
-    defer self.scope = old_scope;
-    self.scope = node.for_node.block.block.scope;
-    identifier := node.for_node.identifier;
-
+    while_node := &mut node.while_node;
     while {
-      for statement in node.while_node.block.block.statements {
+      if while_node.condition.is_some() {
+        if !(*self.visit_expression(while_node.condition.unwrap())).is_truthy() {
+          break;
+        }
+      }
+
+      for statement in while_node.block.block.statements {
         result := self.visit_statement(statement);
         if result.control_flow == ControlFlow::Break {
           return .{
@@ -101,16 +93,13 @@ impl Interp {
       return .{};
     }
 
-    old_scope := self.scope;
-    defer self.scope = old_scope;
-    self.scope = node.for_node.block.block.scope;
     identifier := node.for_node.identifier;
     for element in target.array {
-      option := self.scope.symbols.get(identifier);
+      option := node.parent.block.scope.symbols.get(identifier);
       if option.is_some() {
         *option.unwrap() = *element;
       } else {
-        self.scope.symbols.insert(identifier, element);
+        node.parent.block.scope.symbols.insert(identifier, element);
       }
 
       for statement in node.for_node.block.block.statements {
@@ -306,9 +295,9 @@ impl Interp {
     block := &mut node.block;
     mut cf: ControlFlow = ControlFlow::None;
 
-    old_scope := self.scope;
-    self.scope = block.scope;
-    defer self.scope = old_scope;
+    old_scope := node.parent.block.scope;
+    node.parent.block.scope = block.scope;
+    defer node.parent.block.scope = old_scope;
 
     for statement in node.block.statements {
       result := self.visit_statement(statement);
@@ -328,9 +317,9 @@ impl Interp {
 
     if node.variable.value.is_some() {
       initial_value := self.visit_expression(node.variable.value.unwrap());
-      self.scope.insert(variable_name, initial_value);
+      node.parent.block.scope.insert(variable_name, initial_value);
     } else {
-      self.scope.insert(variable_name, Value::None());
+      node.parent.block.scope.insert(variable_name, Value::None());
     }
 
     return .{
@@ -361,7 +350,7 @@ impl Interp {
 
   visit_function_header :: fn(*mut self, node: *mut Node) {
     funcy := &mut node.function;
-    self.scope.insert(funcy.name, Rc!<Value>::new(Value.{
+    node.parent.block.scope.insert(funcy.name, Rc!<Value>::new(Value.{
       tag: ValueTag::Function,
       function: &mut node.function,
     }));
@@ -393,7 +382,7 @@ impl Interp {
         });
       }
       NodeTag::Identifier: {
-        variable := self.scope.lookup(node.identifier);
+        variable := node.parent.block.scope.lookup(node.identifier);
         if variable.is_none() {
           printlnf("use of undeclared variable: %", (node.identifier,));
           panic("");
@@ -489,24 +478,26 @@ impl Interp {
     return .{};
   }
 
-  run :: fn(*mut self) -> Value {
+  run :: fn(*mut self, root: *mut Node) {
     mut visited_nodes: List!<*mut Node>;
 
-    for node in self.nodes {
+    for node in root.block.statements {
       if node.tag == NodeTag::Function {
         visited_nodes.push(node);
         self.visit_function_header(node);
       }
     }
 
-    for node in self.nodes {
+    for node in root.block.statements {
       if visited_nodes.contains(node, fn(a: *mut Node, b: *mut Node) -> bool {
         return a == b;
       }) then continue;
 
-      self.visit_statement(node);
-    }
+      result := self.visit_statement(node);
 
-    return .{};
+      if result.control_flow != ControlFlow::None {
+        return;
+      }
+    }
   }
 }

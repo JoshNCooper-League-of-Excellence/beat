@@ -265,6 +265,7 @@ NodeTag :: enum {
 
 Node :: struct {
   tag: NodeTag,
+  parent: *mut Node,
   #anon :: union {
     boolean: bool,
     number: f64,

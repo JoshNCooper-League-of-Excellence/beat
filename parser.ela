@@ -3,20 +3,26 @@ import arena::*;
 
 Parser :: struct {
   arena: Arena,
-  scope: *mut Scope,
+  parent: *mut Node,
 }
 
 impl Parser {
   new :: fn() -> #self {
     return .{
       arena: Arena::new(8192, ArenaFlags::Align),
-      scope: new(Scope.{}),
+      parent: new(Node.{
+        tag: NodeTag::Block,
+        block: .{
+          scope: new(Scope.{}),
+        }
+      })
     };
   }
 
   new_node :: fn(*mut self, node: Node) -> *mut Node {
     mem : *mut Node = self.arena.allocate(sizeof(Node));
     *mem = node;
+    mem.parent = self.parent;
     return mem;
   }
 
@@ -318,27 +324,26 @@ impl Parser {
 
     mut statements: List!<*mut Node>;
 
-    scope := self.scope.create_child();
-    old_scope := self.scope;
-    self.scope = scope;
+    scope := self.parent.block.scope.create_child();
+    node := self.new_node(.{
+      tag: NodeTag::Block,
+      block: .{},
+    });
 
-    defer {
-      self.scope = old_scope;
-    }
+    self.parent = node;
+
+    block := &mut node.block;
+    block.scope = scope;
+
 
     while lexer.peek().type != TType::CloseCurly {
-      statements.push(self.parse_statement(lexer));
+      statement := self.parse_statement(lexer);
+      block.statements.push(statement);
     }
 
     lexer.expect(TType::CloseCurly).unwrap();
 
-    return self.new_node(.{
-      tag: NodeTag::Block,
-      block: .{
-        statements: statements,
-        scope: scope,
-      }
-    });
+    return node;
   }
 
   parse_function :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
@@ -425,13 +430,25 @@ impl Parser {
     return null;
   }
 
-  parse :: fn(*mut self, lexer: *mut Lexer) -> List!<*mut Node> {
-    mut nodes: List!<*mut Node>;
+  parse :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
+    mut statements: List!<*mut Node>;
+
+    node := self.new_node(.{
+      tag: NodeTag::Block,
+      block: .{},
+    });
+
+    self.parent = node;
+
+    block := &mut node.block;
+    block.scope = new(Scope.{});
+
     while {
-      token := lexer.peek();
-      if token.type == TType::Eof then break;
-      nodes.push(self.parse_statement(lexer));
+      if lexer.peek().type == TType::Eof { break; }
+      statement := self.parse_statement(lexer);
+      block.statements.push(statement);
     }
-    return nodes;
+
+    return node;
   }
 }
