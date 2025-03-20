@@ -295,3 +295,58 @@ impl Format for Value {
   }
 }
 
+
+
+impl Eq for Value {
+  eq :: fn(self, other: #self) -> bool {
+    if self.tag != other.tag {
+      return false;
+    }
+    switch self.tag {
+      ValueTag::None: {
+        return true;
+      }
+      ValueTag::Number: {
+        return self.number == other.number;
+      }
+      ValueTag::String: {
+        return self.string == other.string;
+      }
+      ValueTag::Boolean: {
+        return self.boolean == other.boolean;
+      }
+      ValueTag::Object: {
+        if self.object.length != other.object.length {
+          return false;
+        }
+        for key, value in self.object {
+          if !other.object.contains(key) || !(*value).eq(*other.object.get(key).unwrap()) {
+            return false;
+          }
+        }
+        return true;
+      }
+      ValueTag::Array: {
+        if self.array.length != other.array.length {
+          return false;
+        }
+        for i in 0..self.array.length {
+          if !(*self.array[i]).eq(*other.array[i]) {
+            return false;
+          }
+        }
+        return true;
+      }
+      ValueTag::Function: {
+        return self.function == other.function;
+      }
+      ValueTag::NativeFunction: {
+        return self.native_function == other.native_function;
+      }
+    }
+    return false;
+  }
+  neq :: fn(self, other: #self) -> bool {
+    return !self.eq(other);
+  }
+}

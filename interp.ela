@@ -47,6 +47,152 @@ impl Interp {
     return &mut self.nodes[self.nodes.length - 1 - index];
   }
 
+  visit_if :: fn(*mut self, node: *mut Node) -> StatementResult {
+    return .{}
+  }
+  visit_else :: fn(*mut self, node: *mut Node) -> StatementResult {
+    return .{}
+  }
+  visit_while :: fn(*mut self, node: *mut Node) -> StatementResult {
+    return .{}
+  }
+  visit_for :: fn(*mut self, node: *mut Node) -> StatementResult {
+    return .{}
+  }
+  visit_binary :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    switch node.binary.operator {
+      TType::Add: {
+        left := *self.visit_expression(self.get_node(node.binary.left));
+        right := *self.visit_expression(self.get_node(node.binary.right));
+        if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
+          return Rc!<Value>::new(Value.{
+          tag: ValueTag::Number,
+          number: left.number + right.number,
+          });
+        } else {
+          panic("addition is only supported for numbers");
+          return .{};
+        }
+      }
+      TType::Sub: {
+        left := *self.visit_expression(self.get_node(node.binary.left));
+        right := *self.visit_expression(self.get_node(node.binary.right));
+        if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
+          return Rc!<Value>::new(Value.{
+          tag: ValueTag::Number,
+          number: left.number - right.number,
+          });
+        } else {
+          panic("subtraction is only supported for numbers");
+          return .{};
+        }
+      }
+      TType::Mul: {
+        left := *self.visit_expression(self.get_node(node.binary.left));
+        right := *self.visit_expression(self.get_node(node.binary.right));
+        if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
+          return Rc!<Value>::new(Value.{
+          tag: ValueTag::Number,
+          number: left.number * right.number,
+          });
+        } else {
+          panic("multiplication is only supported for numbers");
+          return .{};
+        }
+      }
+      TType::Div: {
+        left := *self.visit_expression(self.get_node(node.binary.left));
+        right := *self.visit_expression(self.get_node(node.binary.right));
+        if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
+          return Rc!<Value>::new(Value.{
+          tag: ValueTag::Number,
+          number: left.number / right.number,
+          });
+        } else {
+          panic("division is only supported for numbers");
+          return .{};
+        }
+      }
+      TType::LT: {
+        left := *self.visit_expression(self.get_node(node.binary.left));
+        right := *self.visit_expression(self.get_node(node.binary.right));
+        if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
+          return Rc!<Value>::new(Value.{
+          tag: ValueTag::Boolean,
+          boolean: left.number < right.number,
+          });
+        } else {
+          panic("less than comparison is only supported for numbers");
+          return .{};
+        }
+      }
+      TType::LTE: {
+        left := *self.visit_expression(self.get_node(node.binary.left));
+        right := *self.visit_expression(self.get_node(node.binary.right));
+        if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
+          return Rc!<Value>::new(Value.{
+          tag: ValueTag::Boolean,
+          boolean: left.number <= right.number,
+          });
+        } else {
+          panic("less than or equal comparison is only supported for numbers");
+          return .{};
+        }
+      }
+      TType::GT: {
+        left := *self.visit_expression(self.get_node(node.binary.left));
+        right := *self.visit_expression(self.get_node(node.binary.right));
+        if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
+          return Rc!<Value>::new(Value.{
+          tag: ValueTag::Boolean,
+          boolean: left.number > right.number,
+          });
+        } else {
+          panic("greater than comparison is only supported for numbers");
+          return .{};
+        }
+      }
+      TType::GTE: {
+        left := *self.visit_expression(self.get_node(node.binary.left));
+        right := *self.visit_expression(self.get_node(node.binary.right));
+        if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
+          return Rc!<Value>::new(Value.{
+          tag: ValueTag::Boolean,
+          boolean: left.number >= right.number,
+          });
+        } else {
+          panic("greater than or equal comparison is only supported for numbers");
+          return .{};
+        }
+      }
+      TType::EQ: {
+        left := *self.visit_expression(self.get_node(node.binary.left));
+        right := *self.visit_expression(self.get_node(node.binary.right));
+        return Rc!<Value>::new(Value.{
+          tag: ValueTag::Boolean,
+          boolean: left == right,
+        });
+      }
+      TType::NEQ: {
+        left := *self.visit_expression(self.get_node(node.binary.left));
+        right := *self.visit_expression(self.get_node(node.binary.right));
+        return Rc!<Value>::new(Value.{
+          tag: ValueTag::Boolean,
+          boolean: left != right,
+        });
+      }
+      TType::Assign: {
+        mut left := self.visit_expression(self.get_node(node.binary.left));
+        right := *self.visit_expression(self.get_node(node.binary.right));
+        *left.ptr = right;
+      }
+    }
+    return Value::None();
+  }
+  visit_unary :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+    return .{}
+  }
+
   visit_call :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
     function := *self.visit_expression(self.get_node(node.call.callee));
     mut args: List!<Rc!<Value>>;
@@ -65,12 +211,7 @@ impl Interp {
       return .{};
     }
   }
-  visit_binary :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    return .{}
-  }
-  visit_unary :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    return .{}
-  }
+  
   visit_member_access :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
     object := *self.visit_expression(self.get_node(node.member_access.base));
     if object.tag != ValueTag::Object {
@@ -89,7 +230,7 @@ impl Interp {
   }
 
   visit_subscript :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    array := *self.visit_expression(self.get_node(node.subscript.base));
+    array := self.visit_expression(self.get_node(node.subscript.base)).ptr;
     if array.tag != ValueTag::Array {
       panic("cannot subscript a non-array");
       return .{};
@@ -109,6 +250,7 @@ impl Interp {
 
     return array.array[idx].clone();
   }
+
   visit_object_literal :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
     mut object: Map!<String, Rc!<Value>>;
 
@@ -122,6 +264,7 @@ impl Interp {
       object: object,
     });
   }
+
   visit_array_literal :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
     mut array: List!<Rc!<Value>>;
 
@@ -155,20 +298,21 @@ impl Interp {
       value: None(),
     };
   }
-  visit_if :: fn(*mut self, node: *mut Node) -> StatementResult {
-    return .{}
-  }
-  visit_else :: fn(*mut self, node: *mut Node) -> StatementResult {
-    return .{}
-  }
-  visit_while :: fn(*mut self, node: *mut Node) -> StatementResult {
-    return .{}
-  }
-  visit_for :: fn(*mut self, node: *mut Node) -> StatementResult {
-    return .{}
-  }
+
   visit_variable :: fn(*mut self, node: *mut Node) -> StatementResult {
-    return .{}
+    variable_name := node.variable.name;
+
+    if node.variable.value.is_some() {
+      initial_value := self.visit_expression(self.get_node(node.variable.value.unwrap()));
+      self.scope.insert(variable_name, initial_value);
+    } else {
+      self.scope.insert(variable_name, Value::None());
+    }
+
+    return .{
+      control_flow: ControlFlow::None,
+      value: None(),
+    };
   }
 
   visit_function :: fn(*mut self, function: *mut Function, args: List!<Rc!<Value>>) -> Rc!<Value> {
@@ -249,7 +393,7 @@ impl Interp {
         variable := self.scope.lookup(node.identifier);
         if variable.is_none() {
           printlnf("use of undeclared variable: %", (node.identifier,));
-          exit(1);
+          panic("");
         }
         return variable.unwrap().clone();
       }
@@ -357,7 +501,8 @@ impl Interp {
         return a == b;
       }) then continue;
 
-      node := &mut self.nodes[i];
+      node := self.get_node(i);
+      // println(node.tag);
       self.visit_statement(node);
     }
 
