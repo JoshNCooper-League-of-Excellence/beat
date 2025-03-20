@@ -62,25 +62,17 @@ impl Interp {
   visit_binary :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
     switch node.binary.operator {
       TType::Add: {
-        left := *self.visit_expression(self.get_node(node.binary.left));
-        right := *self.visit_expression(self.get_node(node.binary.right));
-        if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
-          return Rc!<Value>::new(Value.{
-          tag: ValueTag::Number,
-          number: left.number + right.number,
-          });
-        } else {
-          panic("addition is only supported for numbers");
-          return .{};
-        }
+        return 
+          (*self.visit_expression(self.get_node(node.binary.left))) +
+          (*self.visit_expression(self.get_node(node.binary.right)));
       }
       TType::Sub: {
         left := *self.visit_expression(self.get_node(node.binary.left));
         right := *self.visit_expression(self.get_node(node.binary.right));
         if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
           return Rc!<Value>::new(Value.{
-          tag: ValueTag::Number,
-          number: left.number - right.number,
+            tag: ValueTag::Number,
+            number: left.number - right.number,
           });
         } else {
           panic("subtraction is only supported for numbers");
@@ -92,8 +84,8 @@ impl Interp {
         right := *self.visit_expression(self.get_node(node.binary.right));
         if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
           return Rc!<Value>::new(Value.{
-          tag: ValueTag::Number,
-          number: left.number * right.number,
+            tag: ValueTag::Number,
+            number: left.number * right.number,
           });
         } else {
           panic("multiplication is only supported for numbers");
@@ -105,8 +97,8 @@ impl Interp {
         right := *self.visit_expression(self.get_node(node.binary.right));
         if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
           return Rc!<Value>::new(Value.{
-          tag: ValueTag::Number,
-          number: left.number / right.number,
+            tag: ValueTag::Number,
+            number: left.number / right.number,
           });
         } else {
           panic("division is only supported for numbers");
@@ -118,8 +110,8 @@ impl Interp {
         right := *self.visit_expression(self.get_node(node.binary.right));
         if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
           return Rc!<Value>::new(Value.{
-          tag: ValueTag::Boolean,
-          boolean: left.number < right.number,
+            tag: ValueTag::Boolean,
+            boolean: left.number < right.number,
           });
         } else {
           panic("less than comparison is only supported for numbers");
@@ -131,8 +123,8 @@ impl Interp {
         right := *self.visit_expression(self.get_node(node.binary.right));
         if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
           return Rc!<Value>::new(Value.{
-          tag: ValueTag::Boolean,
-          boolean: left.number <= right.number,
+            tag: ValueTag::Boolean,
+            boolean: left.number <= right.number,
           });
         } else {
           panic("less than or equal comparison is only supported for numbers");
@@ -144,8 +136,8 @@ impl Interp {
         right := *self.visit_expression(self.get_node(node.binary.right));
         if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
           return Rc!<Value>::new(Value.{
-          tag: ValueTag::Boolean,
-          boolean: left.number > right.number,
+            tag: ValueTag::Boolean,
+            boolean: left.number > right.number,
           });
         } else {
           panic("greater than comparison is only supported for numbers");
@@ -157,8 +149,8 @@ impl Interp {
         right := *self.visit_expression(self.get_node(node.binary.right));
         if left.tag == ValueTag::Number && right.tag == ValueTag::Number {
           return Rc!<Value>::new(Value.{
-          tag: ValueTag::Boolean,
-          boolean: left.number >= right.number,
+            tag: ValueTag::Boolean,
+            boolean: left.number >= right.number,
           });
         } else {
           panic("greater than or equal comparison is only supported for numbers");

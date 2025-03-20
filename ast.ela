@@ -350,3 +350,100 @@ impl Eq for Value {
     return !self.eq(other);
   }
 }
+
+impl Value {
+  add :: fn(self, other: #self) -> Rc!<Value> {
+    if self.tag == ValueTag::Number && other.tag == ValueTag::Number {
+      return Rc!<Value>::new(Value.{
+        tag: ValueTag::Number,
+        number: self.number + other.number,
+      });
+    } else if self.tag == ValueTag::String && other.tag == ValueTag::String {
+      new_string := format("%%", (self.string, other.string), FormatOptions::default());
+      return Rc!<Value>::new(Value.{
+        tag: ValueTag::String,
+        string: new_string,
+      });
+    } else {
+      panic("addition is only supported for numbers and strings");
+      return .{};
+    }
+  }
+  sub :: fn(self, other: #self) -> Rc!<Value> {
+    if self.tag == ValueTag::Number && other.tag == ValueTag::Number {
+      return Rc!<Value>::new(Value.{
+        tag: ValueTag::Number,
+        number: self.number - other.number,
+      });
+    } else {
+      panic("subtraction is only supported for numbers");
+      return .{};
+    }
+  }
+  mul :: fn(self, other: #self) -> Rc!<Value> {
+    if self.tag == ValueTag::Number && other.tag == ValueTag::Number {
+      return Rc!<Value>::new(Value.{
+        tag: ValueTag::Number,
+        number: self.number * other.number,
+      });
+    } else {
+      panic("multiplication is only supported for numbers");
+      return .{};
+    }
+  }
+  div :: fn(self, other: #self) -> Rc!<Value> {
+    if self.tag == ValueTag::Number && other.tag == ValueTag::Number {
+      return Rc!<Value>::new(Value.{
+        tag: ValueTag::Number,
+        number: self.number / other.number,
+      });
+    } else {
+      panic("division is only supported for numbers");
+      return .{};
+    }
+  }
+  lt :: fn(self, other: #self) -> Rc!<Value> {
+    if self.tag == ValueTag::Number && other.tag == ValueTag::Number {
+      return Rc!<Value>::new(Value.{
+        tag: ValueTag::Boolean,
+        boolean: self.number < other.number,
+      });
+    } else {
+      panic("less than comparison is only supported for numbers");
+      return .{};
+    }
+  }
+  lte :: fn(self, other: #self) -> Rc!<Value> {
+    if self.tag == ValueTag::Number && other.tag == ValueTag::Number {
+      return Rc!<Value>::new(Value.{
+        tag: ValueTag::Boolean,
+        boolean: self.number <= other.number,
+      });
+    } else {
+      panic("less than or equal comparison is only supported for numbers");
+      return .{};
+    }
+  }
+  gt :: fn(self, other: #self) -> Rc!<Value> {
+    if self.tag == ValueTag::Number && other.tag == ValueTag::Number {
+      return Rc!<Value>::new(Value.{
+        tag: ValueTag::Boolean,
+        boolean: self.number > other.number,
+      });
+    } else {
+      panic("greater than comparison is only supported for numbers");
+      return .{};
+    }
+  }
+  gte :: fn(self, other: #self) -> Rc!<Value> {
+    if self.tag == ValueTag::Number && other.tag == ValueTag::Number {
+      return Rc!<Value>::new(Value.{
+        tag: ValueTag::Boolean,
+        boolean: self.number >= other.number,
+      });
+    } else {
+      panic("greater than or equal comparison is only supported for numbers");
+      return .{};
+    }
+  }
+}

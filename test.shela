@@ -1,5 +1,3 @@
-var ix = [0];
-
-ix[0] = 1;
+var ix = "Hello, World!";
 
 print({x = 100, y = 100}, ix);
