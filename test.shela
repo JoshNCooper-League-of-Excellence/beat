@@ -1,52 +1,6 @@
-// if true {
-//   return 10;
-// } else if false {
-//   return 20;
-// } else {
-//   return 90;
-// }
-
-// var uninit;
-// var init = 100;
-
-// fn get_zero() {
-//   return 0;
-// }
-
-// while {
-//   break;
-// }
-
-// while true {
-//   break;
-// }
-
-// fn main(a, b, c) {
-//   return true;
-// }
-
-// var object = { x = 10, y = 10, z = 100 };
-// var array = [0, 1, 2];
-// var array1 = [];
-
-// for index in my_list {
-//   continue; 
-//   break;
-//   return;
-// }
-
-// fn clamp(v, a, b) {
-//   if v < a { 
-//     return a;
-//   }
-//   if v > b {
-//     return b;
-//   }
-//   return v;
-// }
-
-// var x = object.main('Hello, Squirreld');
+main(1250);
 
 fn main(a) {
   print(a);
 }
+

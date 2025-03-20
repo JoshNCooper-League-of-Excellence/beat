@@ -118,7 +118,7 @@ Block :: struct {
 Function :: struct {
   name: String,
   parameters: String[],
-  block: NodeID,
+  block: Block,
 }
 
 TypeDeclaration :: struct {
@@ -188,6 +188,7 @@ NodeTag :: enum {
 
 Node :: struct {
   tag: NodeTag,
+  id: NodeID,
   #anon :: union {
     boolean: bool,
     number: f64,

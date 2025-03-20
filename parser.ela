@@ -51,8 +51,9 @@ impl Parser {
     return .{};
   }
 
-  add_node :: fn(*mut self, node: Node) -> NodeID {
+  add_node :: fn(*mut self, mut node: Node) -> NodeID {
     id := self.nodes.length as NodeID;
+    node.id = id;
     self.nodes.push(node);
     return id;
   }
@@ -333,6 +334,10 @@ impl Parser {
   }
 
   parse_block :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
+    return self.add_node(self.parse_block_direct(lexer));
+  }
+
+  parse_block_direct :: fn(*mut self, lexer: *mut Lexer) -> Node {
     lexer.expect(TType::OpenCurly).unwrap();
 
     mut statements: Node[];
@@ -348,12 +353,12 @@ impl Parser {
     statements = self.nodes;
     self.nodes = old_statements;
 
-    return self.add_node(.{
+    return .{
       tag: NodeTag::Block,
       block: .{
         statements: statements,
       }
-    });
+    };
   }
 
   parse_function :: fn(*mut self, lexer: *mut Lexer) -> NodeID {
@@ -371,13 +376,14 @@ impl Parser {
       }
     }
     lexer.expect(TType::CloseParen).unwrap();
-    block := self.parse_block(lexer);
+    block := self.parse_block_direct(lexer).block;
+    
     return self.add_node(.{
       tag: NodeTag::Function,
       function: .{
-      name: name,
-      parameters: parameters,
-      block: block,
+        name: name,
+        parameters: parameters,
+        block: block,
       }
     });
   }
