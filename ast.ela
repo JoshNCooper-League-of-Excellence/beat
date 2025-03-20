@@ -3,7 +3,49 @@ import lexer::*;
 import rc::*;
 import map::Map;
 
+Precedence :: enum {
+  Lowest,
+  Assignment,  // =
+  Conditional, // ?:
+  LogicalOr,   // ||
+  LogicalAnd,  // &&
+  BitwiseOr,   // |
+  BitwiseXor,  // ^
+  BitwiseAnd,  // &
+  Equality,    // == !=
+  Relational,  // < > <= >=
+  Shift,       // << >>
+  Additive,    // + -
+  Multiplicative, // * / %
+  Unary,       // ! - + ++ --
+  Postfix,     // [] . () -> ++ --
+  Highest
+}
+
+impl Precedence {
+  get :: fn(type: TType) -> #self {
+    if type == TType::Assign {
+      return Precedence::Assignment;
+    } else if type == TType::LT || type == TType::LTE || type == TType::GT || type == TType::GTE {
+      return Precedence::Relational;
+    } else if type == TType::EQ || type == TType::NEQ {
+      return Precedence::Equality;
+    } else if type == TType::Add || type == TType::Sub {
+      return Precedence::Additive;
+    } else if type == TType::Mul || type == TType::Div {
+      return Precedence::Multiplicative;
+    } else if type == TType::Not {
+      return Precedence::Unary;
+    } else if type == TType::Dot {
+      return Precedence::Postfix;
+    } else {
+      return Precedence::Lowest;
+    }
+  }
+}
+
 ValueTag :: enum {
+  Invalid,
   None,
   Number,
   String,
@@ -157,7 +199,7 @@ Block :: struct {
 Function :: struct {
   name: String,
   parameters: String[],
-  block: Block,
+  block: *mut Node,
 }
 
 If :: struct {

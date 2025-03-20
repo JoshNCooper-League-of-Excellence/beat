@@ -5,46 +5,6 @@ Parser :: struct {
   arena: Arena,
 }
 
-Precedence :: enum {
-  Lowest,
-  Assignment,  // =
-  Conditional, // ?:
-  LogicalOr,   // ||
-  LogicalAnd,  // &&
-  BitwiseOr,   // |
-  BitwiseXor,  // ^
-  BitwiseAnd,  // &
-  Equality,    // == !=
-  Relational,  // < > <= >=
-  Shift,       // << >>
-  Additive,    // + -
-  Multiplicative, // * / %
-  Unary,       // ! - + ++ --
-  Postfix,     // [] . () -> ++ --
-  Highest
-}
-
-impl Precedence {
-  get :: fn(type: TType) -> #self {
-    if type == TType::Assign {
-      return Precedence::Assignment;
-    } else if type == TType::LT || type == TType::LTE || type == TType::GT || type == TType::GTE {
-      return Precedence::Relational;
-    } else if type == TType::EQ || type == TType::NEQ {
-      return Precedence::Equality;
-    } else if type == TType::Add || type == TType::Sub {
-      return Precedence::Additive;
-    } else if type == TType::Mul || type == TType::Div {
-      return Precedence::Multiplicative;
-    } else if type == TType::Not {
-      return Precedence::Unary;
-    } else if type == TType::Dot {
-      return Precedence::Postfix;
-    } else {
-      return Precedence::Lowest;
-    }
-  }
-}
 
 impl Parser {
   new :: fn() -> #self {
@@ -53,8 +13,10 @@ impl Parser {
     };
   }
 
-  add_node :: fn(*mut self, node: Node) -> *mut Node {
-    return new(node);
+  new_node :: fn(*mut self, node: Node) -> *mut Node {
+    mem : *mut Node = self.arena.allocate(sizeof(Node));
+    *mem = node;
+    return mem;
   }
 
   parse_primary :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
@@ -72,7 +34,7 @@ impl Parser {
           }
         }
         lexer.expect(TType::CloseCurly).unwrap();
-        return self.add_node(.{
+        return self.new_node(.{
           tag: NodeTag::ObjectLiteral,
           object_literal: .{
             key_values: values,
@@ -89,7 +51,7 @@ impl Parser {
           }
         }
         lexer.expect(TType::CloseBracket).unwrap();
-        return self.add_node(.{
+        return self.new_node(.{
           tag: NodeTag::ArrayLiteral,
           array_literal: .{
             values: values,
@@ -98,41 +60,41 @@ impl Parser {
       }
       TType::Number: {
         lexer.eat();
-        return self.add_node(.{
+        return self.new_node(.{
           tag: NodeTag::Number,
           number: atof(token.value.unwrap().data),
         });
       }
       TType::True: {
         lexer.eat();
-        return self.add_node(.{
+        return self.new_node(.{
           tag: NodeTag::Boolean,
           boolean: true,
         });
       }
       TType::None: {
         lexer.eat();
-        return self.add_node(.{
+        return self.new_node(.{
           tag: NodeTag::None,
         });
       }
       TType::False: {
         lexer.eat();
-        return self.add_node(.{
+        return self.new_node(.{
           tag: NodeTag::Boolean,
           boolean: false,
         });
       }
       TType::String: {
         lexer.eat();
-        return self.add_node(.{
+        return self.new_node(.{
           tag: NodeTag::String,
           string: token.value.unwrap(),
         });
       }
       TType::Identifier: {
         lexer.eat();
-        return self.add_node(.{
+        return self.new_node(.{
           tag: NodeTag::Identifier,
           identifier: token.value.unwrap(),
         });
@@ -165,7 +127,7 @@ impl Parser {
 
           lexer.expect(TType::CloseParen);
 
-          node = self.add_node(.{
+          node = self.new_node(.{
             tag: NodeTag::Call,
             call: .{
               callee: node,
@@ -177,7 +139,7 @@ impl Parser {
           lexer.eat();
           index := self.parse_expression(lexer);
           lexer.expect(TType::CloseBracket).unwrap();
-          node = self.add_node(.{
+          node = self.new_node(.{
             tag: NodeTag::Subscript,
             subscript: .{
               base: node,
@@ -188,7 +150,7 @@ impl Parser {
         TType::Dot: {
           lexer.eat();
           member := lexer.expect(TType::Identifier).unwrap().value.unwrap();
-          node = self.add_node(.{
+          node = self.new_node(.{
             tag: NodeTag::MemberAccess,
             member_access: .{
               base: node,
@@ -207,7 +169,7 @@ impl Parser {
     if token.type == TType::Not || token.type == TType::Sub {
       lexer.eat();
       operand := self.parse_postfix(lexer);
-      return self.add_node(.{
+      return self.new_node(.{
         tag: NodeTag::Unary,
         unary: .{
           operand: operand,
@@ -234,7 +196,7 @@ impl Parser {
           operator: token.type,
         },
       };
-      left = self.add_node(node);
+      left = self.new_node(node);
     }
     return left;
   }
@@ -254,7 +216,7 @@ impl Parser {
 
     if lexer.peek().type == TType::Semi {
       lexer.eat();
-      return self.add_node(.{
+      return self.new_node(.{
         tag: NodeTag::Variable,
         variable: .{
           name: name,
@@ -265,7 +227,7 @@ impl Parser {
       lexer.expect(TType::Assign).unwrap();
       value := Some(self.parse_expression(lexer));
       lexer.expect(TType::Semi).unwrap();
-      return self.add_node(.{
+      return self.new_node(.{
         tag: NodeTag::Variable,
         variable: .{
           name: name,
@@ -285,7 +247,7 @@ impl Parser {
       else_node = Some(self.parse_else(lexer));
     }
     
-    return self.add_node(.{
+    return self.new_node(.{
       tag: NodeTag::If,
       if_node: .{
         condition: condition,
@@ -300,7 +262,7 @@ impl Parser {
 
     if lexer.peek().type == TType::If {
       if_node := Some(self.parse_if(lexer));
-      return self.add_node(.{
+      return self.new_node(.{
         tag: NodeTag::Else,
         else_node: .{
           if_node: if_node,
@@ -308,7 +270,7 @@ impl Parser {
       });
     } else {
       block := Some(self.parse_block(lexer));
-      return self.add_node(.{
+      return self.new_node(.{
         tag: NodeTag::Else,
         else_node: .{
           block: block,
@@ -324,7 +286,7 @@ impl Parser {
       condition = Some(self.parse_expression(lexer));
     }
     block := self.parse_block(lexer);
-    return self.add_node(.{
+    return self.new_node(.{
       tag: NodeTag::While,
       while_node: .{
         condition: condition,
@@ -340,7 +302,7 @@ impl Parser {
     target := self.parse_expression(lexer);
     block := self.parse_block(lexer);
 
-    return self.add_node(.{
+    return self.new_node(.{
       tag: NodeTag::For,
       for_node: .{
         identifier: identifier,
@@ -351,25 +313,23 @@ impl Parser {
   }
 
   parse_block :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
-    return self.add_node(self.parse_block_direct(lexer));
-  }
-
-  parse_block_direct :: fn(*mut self, lexer: *mut Lexer) -> Node {
     lexer.expect(TType::OpenCurly).unwrap();
 
     mut statements: List!<*mut Node>;
     while lexer.peek().type != TType::CloseCurly {
-      statements.push(self.parse_statement(lexer));
+      statement := self.parse_statement(lexer);
+      println(statement.tag);
+      statements.push(statement);
     }
 
     lexer.expect(TType::CloseCurly).unwrap();
 
-    return .{
+    return self.new_node(.{
       tag: NodeTag::Block,
       block: .{
         statements: statements,
       }
-    };
+    });
   }
 
   parse_function :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
@@ -387,9 +347,9 @@ impl Parser {
       }
     }
     lexer.expect(TType::CloseParen).unwrap();
-    block := self.parse_block_direct(lexer).block;
+    block := self.parse_block(lexer);
     
-    return self.add_node(.{
+    return self.new_node(.{
       tag: NodeTag::Function,
       function: .{
         name: name,
@@ -425,7 +385,7 @@ impl Parser {
           expression = Some(self.parse_expression(lexer));
         }
         lexer.expect(TType::Semi).unwrap();
-        return self.add_node(.{
+        return self.new_node(.{
           tag: NodeTag::Return,
           return_node: .{
           expression: expression,
@@ -435,14 +395,14 @@ impl Parser {
       TType::Continue: {
         lexer.eat();
         lexer.expect(TType::Semi).unwrap();
-        return self.add_node(.{
+        return self.new_node(.{
           tag: NodeTag::Continue,
         });
       }
       TType::Break: {
         lexer.eat();
         lexer.expect(TType::Semi).unwrap();
-        return self.add_node(.{
+        return self.new_node(.{
           tag: NodeTag::Break,
         });
       }

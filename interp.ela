@@ -210,7 +210,7 @@ impl Interp {
       return .{};
     }
   }
-  
+
   visit_member_access :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
     object := *self.visit_expression(node.member_access.base);
     if object.tag != ValueTag::Object {
@@ -286,10 +286,10 @@ impl Interp {
     self.scope = block.scope;
     defer self.scope = old_scope;
 
-    for statement in node.block.statements.iter_mut() {
+    for statement in node.block.statements {
       result := self.visit_statement(statement);
 
-      if result.control_flow == ControlFlow::Return 
+      if result.control_flow == ControlFlow::Return
         then return result;
     }
 
@@ -315,22 +315,18 @@ impl Interp {
     };
   }
 
-  visit_function :: fn(*mut self, function: *mut Function, args: List!<Rc!<Value>>) -> Rc!<Value> {
+  visit_function :: fn(*mut self, node: *mut Node, args: List!<Rc!<Value>>) -> Rc!<Value> {
+    function : *mut Function = &mut node.function;
     mut i := 0;
     for param in function.parameters {
       if i >= args.length {
         break;
       }
-      function.block.scope.insert(param, args[i]);
+      function.block.block.scope.insert(param, args[i]);
       i++;
     }
 
-    mut temp_node := Node.{
-      tag: NodeTag::Block,
-      block: function.block,
-    };
-
-    _, value := self.visit_block(&mut temp_node);
+    _, value := self.visit_block(function.block);
 
     if value.is_none() {
       return Value::None();
@@ -348,11 +344,11 @@ impl Interp {
     }));
 
     old_scope := self.scope;
-    funcy.block.scope = old_scope.create_child();
-    self.scope = funcy.block.scope;
+    funcy.block.block.scope = old_scope.create_child();
+    self.scope = funcy.block.block.scope;
 
     old_nodes := self.nodes;
-    self.nodes = funcy.block.statements;
+    self.nodes = funcy.block.block.statements;
 
     defer {
       self.nodes = old_nodes;
@@ -420,12 +416,13 @@ impl Interp {
       }
     }
     return Value::None();
-  } 
+  }
 
   visit_statement :: fn(*mut self, node: *mut Node) -> StatementResult {
     if node.tag == NodeTag::Boolean ||
        node.tag ==  NodeTag::Number ||
        node.tag ==  NodeTag::String ||
+       node.tag ==  NodeTag::None ||
        node.tag ==  NodeTag::Identifier ||
        node.tag ==  NodeTag::Binary ||
        node.tag ==  NodeTag::Unary ||
@@ -481,11 +478,13 @@ impl Interp {
         return self.visit_variable(node);
       }
     }
+    panic("invalid node");
     return .{};
   }
 
   run :: fn(*mut self) -> Value {
     mut visited_nodes: List!<*mut Node>;
+
     for node in self.nodes {
       if node.tag == NodeTag::Function {
         visited_nodes.push(node);
@@ -494,8 +493,6 @@ impl Interp {
     }
 
     for node in self.nodes {
-      // already visited.
-      // we could probably just remove these nodes, but we need them to stay alive.
       if visited_nodes.contains(node, fn(a: *mut Node, b: *mut Node) -> bool {
         return a == b;
       }) then continue;
