@@ -37,4 +37,13 @@ impl!<T> Rc!<T> {
       rc:  new(1 as u64)
     }
   }
+
+  // it seems weird, but we just pass the pointer out,
+  // the one we want dereference.
+  // this allows the compiler to dereference it, and this allows us
+  // to assign via this pointer, instead of always just getting a value.
+  deref :: fn(self) -> *mut T {
+    return self.ptr;
+  }
+  
 }

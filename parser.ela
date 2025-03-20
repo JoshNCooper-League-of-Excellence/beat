@@ -111,6 +111,12 @@ impl Parser {
           boolean: true,
         });
       }
+      TType::None: {
+        lexer.eat();
+        return self.add_node(.{
+          tag: NodeTag::None,
+        });
+      }
       TType::False: {
         lexer.eat();
         return self.add_node(.{

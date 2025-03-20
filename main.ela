@@ -8,6 +8,22 @@ main :: fn() {
   mut parser := Parser::new();
   mut nodes := parser.parse(&mut lexer);
   mut interp := Interp::new(nodes);
-  interp.run();
 
+  interp.scope.insert("print".as_string(), Rc!<Value>::new(Value.{
+    tag: ValueTag::NativeFunction,
+    native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
+      mut builder: StringBuilder;
+      options := FormatOptions::default();
+      for arg in args {
+        (*arg).format(&mut builder, options);
+        builder.append(" ");
+      }
+      mut string := builder.get_string();
+      println(string);
+      string.deinit();
+      builder.deinit();
+    }
+  }));
+
+  interp.run();
 }

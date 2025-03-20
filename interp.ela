@@ -48,14 +48,22 @@ impl Interp {
   }
 
   visit_call :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    function := self.visit_expression(self.get_node(node.call.callee));
+    function := *self.visit_expression(self.get_node(node.call.callee));
     mut args: List!<Rc!<Value>>;
     for arg in node.call.arguments {
       arg_node := self.get_node(arg);
-      args.push(self.visit_expression(arg_node));
+      value := self.visit_expression(arg_node);
+      args.push(value);
     }
 
-    return self.visit_function(function.ptr.function, args);
+    if function.tag == ValueTag::NativeFunction {
+      return function.native_function(args);
+    } else if function.tag == ValueTag::Function {
+      return self.visit_function(function.function, args);
+    } else {
+      panic("cannot call a non function");
+      return .{};
+    }
   }
   visit_binary :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
     return .{}
@@ -166,6 +174,11 @@ impl Interp {
         return Rc!<Value>::new(Value.{
           tag: ValueTag::Boolean,
           boolean: node.boolean,
+        });
+      }
+      NodeTag::None: {
+        return Rc!<Value>::new(Value.{
+          tag: ValueTag::None,
         });
       }
       NodeTag::Number: {
@@ -291,9 +304,8 @@ impl Interp {
       if visited_indices.contains(i, fn(a: u32, b: u32) -> bool {
         return a == b;
       }) then continue;
-
+      
       node := &mut self.nodes[i];
-      println(node.tag);
       self.visit_statement(node);
     }
 

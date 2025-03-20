@@ -71,6 +71,7 @@ TType :: enum {
 
   True,
   False,
+  None,
 }
 
 Token :: struct {
@@ -91,6 +92,8 @@ Lexer :: struct {
 impl Lexer {
   new :: fn(path: String) -> #self {
     mut keywords: Map!<str, TType>;
+
+    keywords.insert("none", TType::None);
 
     keywords.insert("if", TType::If);
     keywords.insert("else", TType::Else);
@@ -227,7 +230,7 @@ impl Lexer {
         break;
       } else if isdigit(ch) {
         start := self.position;
-        while isdigit(ch) {
+        while isdigit(ch) || ch == '.' {
           self.get_next_char(&mut ch);
         }
         end := self.position;

@@ -11,6 +11,14 @@
       "program": "${workspaceFolder}/main",
       "args": [],
       "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Compilator",
+      "program": "/usr/local/bin/ela",
+      "args": ["main.ela"],
+      "cwd": "${workspaceFolder}"
     }
   ]
 }

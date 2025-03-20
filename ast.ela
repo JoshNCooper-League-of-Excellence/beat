@@ -13,7 +13,11 @@ ValueTag :: enum {
   Object,
   Array,
   Function,
+  NativeFunction,
 }
+
+Value :: struct;
+alias NativeFunction :: fn *(List!<Rc!<Value>>) -> Rc!<Value>;
 
 Value :: struct {
   tag: ValueTag,
@@ -24,6 +28,7 @@ Value :: struct {
     object: Map!<String, Rc!<Value>>,
     array:  List!<Rc!<Value>>,
     function: *mut Function,
+    native_function: NativeFunction,
   }
 }
 
@@ -158,6 +163,7 @@ Variable :: struct {
 }
 
 NodeTag :: enum {
+  None, // 'none' value, not an invalid ntag.
   Boolean,
   Number,
   String,
@@ -216,3 +222,72 @@ Node :: struct {
 
   },
 }
+
+impl Format for Value {
+  format :: fn(*const self, builder: *mut StringBuilder, options: FormatOptions) {
+    switch self.tag {
+      ValueTag::None: {
+        builder.append("none");
+      }
+      ValueTag::Number: {
+        builder.appendf("%", (self.number,), options);
+      }
+      ValueTag::String: {
+        builder.appendf("\"%\"", (self.string,), options);
+      }
+      ValueTag::Boolean: {
+        builder.appendf("%", (self.boolean,), options);
+      }
+      ValueTag::Object: {
+        builder.append("{");
+        if options.indented {
+          builder.append("\n  ");
+        }
+        mut index := 0;
+        for key, value in self.object {
+          builder.appendf("\"%\": ", (key,), options);
+          (*value).format(builder, options);
+          if options.indented && index != self.object.length - 1 {
+            builder.append(",\n  ");
+          }
+          index++;
+        }
+        if options.indented {
+          builder.append("\n");
+        }
+        builder.append("}");
+      }
+      ValueTag::Array: {
+        builder.append("[");
+        if options.indented then builder.append("\n  ");
+        
+        mut index := 0;
+        for value in self.array {
+          (*value).format(builder, options);;
+          if options.indented && index != self.object.length - 1 {
+            builder.append(",\n  ");
+          }
+          index++;
+        }
+        if options.indented then builder.append("\n");
+        builder.append("]");
+      }
+      ValueTag::Function: {
+        builder.append("fn(");
+        mut index := 0;
+        for param in self.function.parameters {
+          if index != self.function.parameters.length - 1 {
+            builder.appendf("%, ", (param,), options);
+          } else {
+            builder.appendf("%", (param,), options);
+          }
+        }
+        builder.append(")");
+      }
+      ValueTag::NativeFunction: {
+        builder.append("@builtin::fn()");
+      }
+    }
+  }
+}
+
