@@ -1,8 +1,16 @@
-var ix = [0] + "Hello, World!" + 2 + 3;
 
-print({x = 100, y = 100}, ix);
+var global = {
+  print = print,
+  range = range
+};
+
+fn main() {
+  var x = 0;
+  for j in range(0, 24, 2) {
+    for i in range(0, 24, 2) {
+      print(i * j);
+    }
+  }
+}
 
 main();
-fn main() {
-  print("bah");
-}

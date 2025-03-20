@@ -34,9 +34,9 @@ StatementResult :: struct {
 }
 
 impl Interp {
-  new :: fn(mut nodes: List!<*mut Node>) -> #self {
+  new :: fn(scope: *mut Scope, mut nodes: List!<*mut Node>) -> #self {
     return .{
-      scope: new(Scope.{}),
+      scope: scope,
       nodes: nodes,
     };
   }
@@ -67,20 +67,27 @@ impl Interp {
   }
 
   visit_while :: fn(*mut self, node: *mut Node) -> StatementResult {
+    old_scope := self.scope;
+    defer self.scope = old_scope;
+    self.scope = node.for_node.block.block.scope;
+    identifier := node.for_node.identifier;
+
     while {
-      if node.while_node.condition.is_some() {
-        condition := *self.visit_expression(node.while_node.condition.unwrap());
-        if !condition.is_truthy() {
+      for statement in node.while_node.block.block.statements {
+        result := self.visit_statement(statement);
+        if result.control_flow == ControlFlow::Break {
+          return .{
+            control_flow: ControlFlow::None,
+            value: None()
+          };
+        } else if result.control_flow == ControlFlow::Continue {
           break;
+        } else if result.control_flow == ControlFlow::Return {
+          return result;
         }
       }
-      result := self.visit_statement(node.while_node.block);
-      if result.control_flow == ControlFlow::Break {
-        break;
-      } else if result.control_flow == ControlFlow::Return {
-        return result;
-      }
     }
+
     return .{
       control_flow: ControlFlow::None,
       value: None(),
@@ -94,13 +101,30 @@ impl Interp {
       return .{};
     }
 
+    old_scope := self.scope;
+    defer self.scope = old_scope;
+    self.scope = node.for_node.block.block.scope;
+    identifier := node.for_node.identifier;
     for element in target.array {
-      self.scope.insert(node.for_node.identifier, element);
-      result := self.visit_statement(node.for_node.block);
-      if result.control_flow == ControlFlow::Break {
-        break;
-      } else if result.control_flow == ControlFlow::Return {
-        return result;
+      option := self.scope.symbols.get(identifier);
+      if option.is_some() {
+        *option.unwrap() = *element;
+      } else {
+        self.scope.symbols.insert(identifier, element);
+      }
+
+      for statement in node.for_node.block.block.statements {
+        result := self.visit_statement(statement);
+        if result.control_flow == ControlFlow::Break {
+          return .{
+            control_flow: ControlFlow::None,
+            value: None()
+          };
+        } else if result.control_flow == ControlFlow::Continue {
+          break;
+        } else if result.control_flow == ControlFlow::Return {
+          return result;
+        }
       }
     }
     return .{
@@ -289,7 +313,7 @@ impl Interp {
     for statement in node.block.statements {
       result := self.visit_statement(statement);
 
-      if result.control_flow == ControlFlow::Return
+      if result.control_flow != ControlFlow::None
         then return result;
     }
 
@@ -337,27 +361,10 @@ impl Interp {
 
   visit_function_header :: fn(*mut self, node: *mut Node) {
     funcy := &mut node.function;
-
     self.scope.insert(funcy.name, Rc!<Value>::new(Value.{
       tag: ValueTag::Function,
       function: &mut node.function,
     }));
-
-    old_scope := self.scope;
-    funcy.block.block.scope = old_scope.create_child();
-    self.scope = funcy.block.block.scope;
-
-    old_nodes := self.nodes;
-    self.nodes = funcy.block.block.statements;
-
-    defer {
-      self.nodes = old_nodes;
-      self.scope = old_scope;
-    }
-
-    for param in funcy.parameters {
-      self.scope.insert(param, Value::None());
-    }
   }
 
   visit_expression :: fn(*mut self, node: *mut Node) -> Rc!<Value> {

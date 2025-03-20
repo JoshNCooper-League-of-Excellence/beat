@@ -60,7 +60,6 @@ TType :: enum {
   For,
   In,
   While,
-  Make,
   
   Return,
   Continue,
@@ -105,7 +104,6 @@ impl Lexer {
     keywords.insert("while", TType::While);
     keywords.insert("for", TType::For);
     keywords.insert("in", TType::In);
-    keywords.insert("make", TType::Make);
     keywords.insert("return", TType::Return);
     keywords.insert("continue", TType::Continue);
     keywords.insert("break", TType::Break);

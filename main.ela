@@ -7,9 +7,9 @@ main :: fn() {
   mut lexer := Lexer::new("test.shela".as_string());
   mut parser := Parser::new();
   mut nodes := parser.parse(&mut lexer);
-  mut interp := Interp::new(nodes);
+  mut interp := Interp::new(parser.scope, nodes);
 
-  interp.scope.insert("print".as_string(), Rc!<Value>::new(Value.{
+  parser.scope.insert("print".as_string(), Rc!<Value>::new(Value.{
     tag: ValueTag::NativeFunction,
     native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
       mut builder: StringBuilder;
@@ -22,6 +22,33 @@ main :: fn() {
       println(string);
       string.deinit();
       builder.deinit();
+    }
+  }));
+
+  parser.scope.insert("range".as_string(), Rc!<Value>::new(Value.{
+    tag: ValueTag::NativeFunction,
+    native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
+      if args.length < 2 {
+        return Value::None();
+      }
+      min := args[0].ptr.number;
+      max := args[1].ptr.number;
+      mut increment := 1.0;
+      if args.length > 2 {
+        increment = args[2].ptr.number;
+      }
+      count := ((max - min) / increment) as u64;
+      mut array: List!<Rc!<Value>>;
+      for i in 0..count {
+        array.push(Rc!<Value>::new(Value.{
+          tag: ValueTag::Number,
+          number: min + (i as f64) * increment,
+        }));
+      }
+      return Rc!<Value>::new(Value.{
+        tag: ValueTag::Array,
+        array: array,
+      });
     }
   }));
 

@@ -3,13 +3,14 @@ import arena::*;
 
 Parser :: struct {
   arena: Arena,
+  scope: *mut Scope,
 }
-
 
 impl Parser {
   new :: fn() -> #self {
     return .{
       arena: Arena::new(8192, ArenaFlags::Align),
+      scope: new(Scope.{}),
     };
   }
 
@@ -22,7 +23,7 @@ impl Parser {
   parse_primary :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
     token := lexer.peek();
     switch token.type {
-      TType::OpenCurly: {  
+      TType::OpenCurly: {
         lexer.eat();
         mut values: Map!<String, *mut Node>;
         while lexer.peek().type != TType::CloseCurly {
@@ -38,10 +39,10 @@ impl Parser {
           tag: NodeTag::ObjectLiteral,
           object_literal: .{
             key_values: values,
-          } 
+          }
         });
       }
-      TType::OpenBracket: { 
+      TType::OpenBracket: {
         lexer.eat();
         mut values: List!<*mut Node>;
         while lexer.peek().type != TType::CloseBracket {
@@ -55,7 +56,7 @@ impl Parser {
           tag: NodeTag::ArrayLiteral,
           array_literal: .{
             values: values,
-          } 
+          }
         });
       }
       TType::Number: {
@@ -98,7 +99,7 @@ impl Parser {
           tag: NodeTag::Identifier,
           identifier: token.value.unwrap(),
         });
-      } 
+      }
       else: {
         panic("invalid primary expression");
       }
@@ -158,7 +159,7 @@ impl Parser {
             },
           });
         }
-        else: { break; } 
+        else: { break; }
       }
     }
     return node;
@@ -246,7 +247,7 @@ impl Parser {
     if lexer.peek().type == TType::Else {
       else_node = Some(self.parse_else(lexer));
     }
-    
+
     return self.new_node(.{
       tag: NodeTag::If,
       if_node: .{
@@ -316,10 +317,17 @@ impl Parser {
     lexer.expect(TType::OpenCurly).unwrap();
 
     mut statements: List!<*mut Node>;
+
+    scope := self.scope.create_child();
+    old_scope := self.scope;
+    self.scope = scope;
+
+    defer {
+      self.scope = old_scope;
+    }
+
     while lexer.peek().type != TType::CloseCurly {
-      statement := self.parse_statement(lexer);
-      println(statement.tag);
-      statements.push(statement);
+      statements.push(self.parse_statement(lexer));
     }
 
     lexer.expect(TType::CloseCurly).unwrap();
@@ -328,6 +336,7 @@ impl Parser {
       tag: NodeTag::Block,
       block: .{
         statements: statements,
+        scope: scope,
       }
     });
   }
@@ -348,7 +357,7 @@ impl Parser {
     }
     lexer.expect(TType::CloseParen).unwrap();
     block := self.parse_block(lexer);
-    
+
     return self.new_node(.{
       tag: NodeTag::Function,
       function: .{
