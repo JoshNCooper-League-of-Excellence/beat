@@ -19,10 +19,10 @@ impl Interp {
     condition := self.visit_expression(node.if_node.condition);
     if condition.ptr.is_truthy() {
       condition.deinit();
-      return self.visit_statement(node.if_node.block);
+      return self.visit_block(node.if_node.block);
     } else if node.if_node.else_node.is_some() {
       condition.deinit();
-      return self.visit_statement(node.if_node.else_node.unwrap());
+      return self.visit_block(node.if_node.else_node.unwrap());
     }
     condition.deinit();
     return .{
@@ -306,16 +306,25 @@ impl Interp {
 
   visit_function :: fn(*mut self, node: *mut Node, args: List!<Rc!<Value>>) -> Rc!<Value> {
     function : *mut Function = &mut node.function;
+
+    mut scope: Scope;
+    scope.parent = function.block.block.scope.parent;
+
     mut i := 0;
     for param in function.parameters {
       if i >= args.length {
         break;
       }
-      function.block.block.scope.insert(param, args[i].clone());
+      scope.symbols.insert(param, args[i].clone());
       i++;
     }
 
+    old_scope := function.block.block.scope;
+    function.block.block.scope = &mut scope;
+
     _, value := self.visit_block(function.block);
+
+    function.block.block.scope = old_scope;
 
     if value.is_none() {
       return Value::None();

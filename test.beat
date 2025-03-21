@@ -1,6 +1,6 @@
-fn main() {
-  var x = [] + 0 + "магазин";
-  print(x);
+
+fn fibo(n) {
+  print(n);
 }
 
-main();
+fibo(1);
