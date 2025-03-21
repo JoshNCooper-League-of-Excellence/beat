@@ -193,7 +193,6 @@ ArrayLiteral :: struct {
 }
 
 Block :: struct {
-  scope: *mut Scope,
   statements: List!<*mut Node>,
 }
 
@@ -272,7 +271,6 @@ NodeTag :: enum {
 
 Node :: struct {
   tag: NodeTag,
-  parent: *mut Node,
   #anon :: union {
     boolean: bool,
     number: f64,

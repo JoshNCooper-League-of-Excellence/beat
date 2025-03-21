@@ -1,6 +1,8 @@
 import parser::*;
 
-Interp :: struct {}
+Interp :: struct {
+  scope: *mut Scope,
+}
 
 ControlFlow :: enum {
   None,
@@ -12,6 +14,23 @@ ControlFlow :: enum {
 StatementResult :: struct {
   control_flow: ControlFlow,
   value: Option!<Rc!<Value>>,
+}
+
+impl Interp {
+  enter_scope :: fn(*mut self) -> *mut Scope {
+    old_scope := self.scope;
+    mut scope := self.scope.create_child();
+    self.scope = scope;
+    return old_scope;
+  }
+  release_scope :: fn(*mut self, scope: *mut Scope) {
+    for key, value in self.scope.symbols {
+      key.deinit();
+      value.deinit();
+    }
+    get_default_allocator().free(self.scope);
+    self.scope = scope;
+  }
 }
 
 impl Interp {
@@ -45,6 +64,11 @@ impl Interp {
 
   visit_while :: fn(*mut self, node: *mut Node) -> StatementResult {
     while_node := &mut node.while_node;
+
+    // TODO: this should be IN the while loop.
+    old_scope := self.enter_scope();
+    defer self.release_scope(old_scope);
+
     while {
       if while_node.condition.is_some() {
         condition := self.visit_expression(while_node.condition.unwrap());
@@ -86,12 +110,18 @@ impl Interp {
 
     identifier := node.for_node.identifier;
     defer target.deinit();
+
+    old_scope := self.enter_scope();
+    defer {
+      self.release_scope(old_scope);
+    }
+
     for element in target.ptr.array {
-      option := node.parent.block.scope.symbols.get(identifier);
+      option := self.scope.symbols.get(identifier);
       if option.is_some() {
         *option.unwrap() = *element;
       } else {
-        node.parent.block.scope.symbols.insert(identifier, element.clone());
+        self.scope.symbols.insert(identifier, element.clone());
       }
 
       for statement in node.for_node.block.block.statements {
@@ -175,23 +205,24 @@ impl Interp {
       args.push(value);
     }
 
+    defer function.deinit();
+
     result := switch function.ptr.tag {
       ValueTag::NativeFunction => function.ptr.native_function(args),
       ValueTag::Function => self.visit_function(function.ptr.function, args),
       else: {
-        function.deinit();
         panic("cannot call a non function");
         return Value::None();
       },
     };
-    function.deinit();
     return result;
   }
 
   visit_member_access :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
     object := self.visit_expression(node.member_access.base);
+    defer object.deinit();
+
     if object.ptr.tag != ValueTag::Object {
-      object.deinit();
       panic("cannot access member of a non-object");
       return Value::None();
     }
@@ -199,44 +230,33 @@ impl Interp {
     member := node.member_access.member;
     value := object.ptr.object.get(member);
     if value.is_none() {
-      object.deinit();
       panic("member not found in object");
       return Value::None();
     }
 
     result := value.unwrap();
-    object.deinit();
     return result;
   }
 
   visit_subscript :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
     array := self.visit_expression(node.subscript.base);
-    if array.ptr.tag != ValueTag::Array {
-      array.deinit();
-      panic("cannot subscript a non-array");
-      return Value::None();
-    }
+    defer array.deinit();
+
+    if array.ptr.tag != ValueTag::Array
+      then return Value::None();
 
     index := self.visit_expression(node.subscript.index);
-    if index.ptr.tag != ValueTag::Number {
-      array.deinit();
-      index.deinit();
-      panic("array index must be a number");
-      return Value::None();
-    }
+
+    defer index.deinit();
+
+    if index.ptr.tag != ValueTag::Number 
+      then return Value::None();
 
     idx := index.ptr.number as u64;
-    if idx >= array.ptr.array.length {
-      array.deinit();
-      index.deinit();
-      panic("array index out of bounds");
-      return Value::None();
-    }
+    if idx >= array.ptr.array.length 
+      then return Value::None();
 
-    result := array.ptr.array[idx].clone();
-    array.deinit();
-    index.deinit();
-    return result;
+    return array.ptr.array[idx].clone();
   }
 
   visit_object_literal :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
@@ -274,14 +294,21 @@ impl Interp {
 
   visit_block :: fn(*mut self, node: *mut Node) -> StatementResult {
     block := &mut node.block;
+
+    old_scope := self.enter_scope();
+    defer {
+      self.release_scope(old_scope);
+    }
+
     mut cf: ControlFlow = ControlFlow::None;
 
     for statement in node.block.statements {
       result := self.visit_statement(statement);
-
-      if result.control_flow != ControlFlow::None
-        then return result;
+      if result.control_flow != ControlFlow::None {
+        return result;
+      }
     }
+
 
     return .{
       control_flow: ControlFlow::None,
@@ -294,9 +321,9 @@ impl Interp {
 
     if node.variable.value.is_some() {
       initial_value := self.visit_expression(node.variable.value.unwrap());
-      node.parent.block.scope.insert(variable_name, initial_value);
+      self.scope.insert(variable_name, initial_value);
     } else {
-      node.parent.block.scope.insert(variable_name, Value::None());
+      self.scope.insert(variable_name, Value::None());
     }
     return .{
       control_flow: ControlFlow::None,
@@ -306,25 +333,22 @@ impl Interp {
 
   visit_function :: fn(*mut self, node: *mut Node, args: List!<Rc!<Value>>) -> Rc!<Value> {
     function : *mut Function = &mut node.function;
+    old_scope := self.enter_scope();
 
-    mut scope: Scope;
-    scope.parent = function.block.block.scope.parent;
+    defer {
+      self.release_scope(old_scope);
+    }
 
     mut i := 0;
     for param in function.parameters {
       if i >= args.length {
         break;
       }
-      scope.symbols.insert(param, args[i].clone());
+      self.scope.symbols.insert(param, args[i].clone());
       i++;
     }
 
-    old_scope := function.block.block.scope;
-    function.block.block.scope = &mut scope;
-
     _, value := self.visit_block(function.block);
-
-    function.block.block.scope = old_scope;
 
     if value.is_none() {
       return Value::None();
@@ -335,7 +359,7 @@ impl Interp {
 
   visit_function_header :: fn(*mut self, node: *mut Node) {
     funcy := &mut node.function;
-    node.parent.block.scope.insert(funcy.name, Rc!<Value>::new(Value.{
+    self.scope.insert(funcy.name, Rc!<Value>::new(Value.{
       tag: ValueTag::Function,
       function: &mut node.function,
     }));
@@ -376,10 +400,9 @@ impl Interp {
         });
       }
       NodeTag::Identifier: {
-        variable := node.parent.block.scope.lookup(node.identifier);
+        variable := self.scope.lookup(node.identifier);
         if variable.is_none() {
-          printlnf("use of undeclared variable: %", (node.identifier,));
-          panic("");
+          return Value::None();
         }
         return variable.unwrap();
       }
@@ -474,7 +497,7 @@ impl Interp {
 
   run :: fn(*mut self, root: *mut Node) {
     mut visited_nodes: List!<*mut Node>;
-
+    
     for node in root.block.statements {
       if node.tag == NodeTag::Function {
         visited_nodes.push(node);

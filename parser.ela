@@ -16,7 +16,7 @@ impl Parser {
   new_node :: fn(*mut self, node: Node) -> *mut Node {
     mem : *mut Node = self.arena.allocate(sizeof(Node));
     *mem = node;
-    mem.parent = self.parent;
+  
     return mem;
   }
 
@@ -335,22 +335,12 @@ impl Parser {
 
     mut statements: List!<*mut Node>;
 
-    scope := self.parent.block.scope.create_child();
     node := self.new_node(.{
       tag: NodeTag::Block,
       block: .{},
     });
 
     block := &mut node.block;
-    block.scope = scope;
-
-    old_parent := self.parent;
-    self.parent = node;
-
-    defer {
-      self.parent = old_parent;
-    }
-
 
     while lexer.peek().type != TType::CloseCurly {
       statement := self.parse_statement(lexer);
@@ -453,11 +443,8 @@ impl Parser {
       tag: NodeTag::Block,
       block: .{},
     });
-
-    self.parent = node;
-
+    
     block := &mut node.block;
-    block.scope = get_default_allocator().new_ptr(Scope.{});
 
     while {
       if lexer.peek().type == TType::Eof { break; }
