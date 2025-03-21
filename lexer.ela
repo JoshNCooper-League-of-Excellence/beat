@@ -18,9 +18,16 @@ impl SourceLocation {
     return format("%:%:%", self, FormatOptions::default());
   }
 }
+
 LexError :: struct {
   location: SourceLocation,
   message:  String,
+}
+
+impl LexError {
+  print :: fn(self) {
+    printlnf("error at %:%:%\n%", (self.location.0, self.location.1, self.location.2, self.message));
+  }
 }
 
 TType :: enum {
@@ -143,17 +150,20 @@ impl Lexer {
     mut token: Token;
 
     token.type = TType::Eof;
+    token.location = self.location;
 
     while self.position < self.input.length {
       mut ch := self.input[self.position];
 
       if ch == '\n' {
         self.advance(true);
+        token.location = self.location;
         continue;
       }
 
       if ch == ' ' || ch == '\t' {
         self.advance(false);
+        token.location = self.location;
         continue;
       }
 
@@ -316,11 +326,11 @@ impl Lexer {
     }
   }
 
-  eat :: fn(*mut self) -> Result!<Token, LexError> {
+  eat :: fn(*mut self) -> Token {
     if self.buffer.length == 0 {
       self.fill_buffer();
     }
-    return Result!<Token, LexError>::Ok(self.buffer.pop_front());
+    return self.buffer.pop_front();
   }
 
   peek :: fn(*mut self) -> Token {
@@ -330,21 +340,16 @@ impl Lexer {
     return self.buffer[0];
   }
 
-  expect :: fn(*mut self, expected: TType) -> Result!<Token, LexError> {
-    token_result := self.eat();
-
-    if (token_result.is_err()) {
-      return token_result.propagate();
-    }
-
-    token := token_result.unwrap();
+  expect :: fn(*mut self, expected: TType) -> Token {
+    token := self.eat();
 
     if token.type != expected {
-      return Result!<Token, LexError>::Err(LexError.{
+      error := LexError.{
         location: token.location,
         message: format("Expected token type: %, but got: %", (expected, token.type), FormatOptions::default()),
-      });
+      };
+      error.print();
     }
-    return Result!<Token, LexError>::Ok(token);
+    return token;
   }
 }

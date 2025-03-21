@@ -10,8 +10,8 @@ import fs::File;
 #c_flags " -lm "
 #foreign fmod :: fn(a: f64, b: f64) -> s32;
 
-bootstrap_builtin_functions :: fn(interp: *mut Interp) {
-  interp.scope.insert("print".to_string(get_default_allocator()), Rc!<Value>::new(Value.{
+bootstrap_builtin_functions :: fn(interp: *mut Interp, alloc: *mut Dyn_Allocator) {
+  interp.scope.insert("print".to_string(alloc), Rc!<Value>::new(Value.{
     tag: ValueTag::NativeFunction,
     native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
       mut builder: StringBuilder;
@@ -27,7 +27,7 @@ bootstrap_builtin_functions :: fn(interp: *mut Interp) {
     }
   }));
 
-  interp.scope.insert("mod".to_string(get_default_allocator()), Rc!<Value>::new(Value.{
+  interp.scope.insert("mod".to_string(alloc), Rc!<Value>::new(Value.{
     tag: ValueTag::NativeFunction,
     native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
       if args.length != 2 {
@@ -43,7 +43,7 @@ bootstrap_builtin_functions :: fn(interp: *mut Interp) {
     }
   }));
 
-  interp.scope.insert("range".to_string(get_default_allocator()), Rc!<Value>::new(Value.{
+  interp.scope.insert("range".to_string(alloc), Rc!<Value>::new(Value.{
     tag: ValueTag::NativeFunction,
     native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
       if args.length < 2 {
@@ -70,7 +70,7 @@ bootstrap_builtin_functions :: fn(interp: *mut Interp) {
     }
   }));
 
-  interp.scope.insert("fread".to_string(get_default_allocator()), Rc!<Value>::new(Value.{
+  interp.scope.insert("fread".to_string(alloc), Rc!<Value>::new(Value.{
     tag: ValueTag::NativeFunction,
     native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
       path := args[0].ptr.string;
@@ -83,7 +83,7 @@ bootstrap_builtin_functions :: fn(interp: *mut Interp) {
     }
   }));
 
-  interp.scope.insert("getchar".to_string(get_default_allocator()), Rc!<Value>::new(Value.{
+  interp.scope.insert("getchar".to_string(alloc), Rc!<Value>::new(Value.{
     tag: ValueTag::NativeFunction,
     native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
       mut buffer: u8[2048];
@@ -92,7 +92,7 @@ bootstrap_builtin_functions :: fn(interp: *mut Interp) {
 
       // Remove the newline character if present
       mut length := strlen(buffer);
-      
+
       if length > 0 && buffer[length - 1] == '\n' {
         buffer[length - 1] = '\0';
       }
@@ -105,7 +105,6 @@ bootstrap_builtin_functions :: fn(interp: *mut Interp) {
       );
     }
   }));
-
 }
 
 main :: fn() {
@@ -135,7 +134,9 @@ main :: fn() {
   mut interp := Interp.{
     scope: allocator.new_ptr(Scope.{}),
   };
-  bootstrap_builtin_functions(&mut interp);
+  
+  bootstrap_builtin_functions(&mut interp, allocator);
+
   interp.run(root);
 
 }

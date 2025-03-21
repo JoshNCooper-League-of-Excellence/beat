@@ -310,7 +310,7 @@ impl Format for Value {
         builder.appendf("%", (self.number,), options);
       }
       ValueTag::String: {
-        builder.appendf("\"%\"", (self.string,), options);
+        builder.appendf("%", (self.string,), options);
       }
       ValueTag::Boolean: {
         builder.appendf("%", (self.boolean,), options);
@@ -439,12 +439,18 @@ impl Rc!<Value> {
         string: string,
       });
     } else if self.ptr.tag == ValueTag::Array {
-      self.ptr.array.push(other);
-      return self;
+      mut new_array := self.ptr.array.clone();
+      new_array.push(other);
+      return Rc!<Value>::new(Value.{
+        tag: ValueTag::Array,
+        array: new_array,
+      });
+    } else {
+      panic("addition is not supported for these types");
+      return Value::None();
     }
-
-    return Value::None();
   }
+
   sub :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
     if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
@@ -456,6 +462,7 @@ impl Rc!<Value> {
       return Value::None();
     }
   }
+
   mul :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
     if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
@@ -467,8 +474,13 @@ impl Rc!<Value> {
       return Value::None();
     }
   }
+
   div :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
     if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
+      if other.ptr.number == 0.0 {
+        panic("division by zero");
+        return Value::None();
+      }
       return Rc!<Value>::new(Value.{
         tag: ValueTag::Number,
         number: self.ptr.number / other.ptr.number,
@@ -478,6 +490,7 @@ impl Rc!<Value> {
       return Value::None();
     }
   }
+
   lt :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
     if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
@@ -489,6 +502,7 @@ impl Rc!<Value> {
       return Value::None();
     }
   }
+
   lte :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
     if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
@@ -500,6 +514,7 @@ impl Rc!<Value> {
       return Value::None();
     }
   }
+
   gt :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
     if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
@@ -511,6 +526,7 @@ impl Rc!<Value> {
       return Value::None();
     }
   }
+
   gte :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
     if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
