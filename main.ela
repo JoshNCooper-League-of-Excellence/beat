@@ -7,7 +7,7 @@ import interp::*;
 #foreign fmod :: fn(a: f64, b: f64) -> s32;
 
 bootstrap_builtin_functions :: fn(root: *mut Node) {
-  root.block.scope.insert("print".as_string(), Rc!<Value>::new(Value.{
+  root.block.scope.insert("print".to_string(get_default_allocator()), Rc!<Value>::new(Value.{
     tag: ValueTag::NativeFunction,
     native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
       mut builder: StringBuilder;
@@ -23,7 +23,7 @@ bootstrap_builtin_functions :: fn(root: *mut Node) {
     }
   }));
 
-  root.block.scope.insert("mod".as_string(), Rc!<Value>::new(Value.{
+  root.block.scope.insert("mod".to_string(get_default_allocator()), Rc!<Value>::new(Value.{
     tag: ValueTag::NativeFunction,
     native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
       if args.length != 2 {
@@ -39,7 +39,7 @@ bootstrap_builtin_functions :: fn(root: *mut Node) {
     }
   }));
 
-  root.block.scope.insert("range".as_string(), Rc!<Value>::new(Value.{
+  root.block.scope.insert("range".to_string(get_default_allocator()), Rc!<Value>::new(Value.{
     tag: ValueTag::NativeFunction,
     native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
       if args.length < 2 {
@@ -68,8 +68,10 @@ bootstrap_builtin_functions :: fn(root: *mut Node) {
 }
 
 main :: fn() {
-  args := Env::args();
+  *get_default_allocator() = Dyn_Allocator::new(&mut Tracking_Allocator.{});
+  mut args := Env::args();
   mut path: String;
+
   if args.length >= 2 {
     path = String::from(args[1]);
   } else {
@@ -77,12 +79,17 @@ main :: fn() {
     return;
   }
 
-  mut lexer := Lexer::new(path);
+  mut lexer := Lexer::new(get_default_allocator(), path);
   mut parser := Parser::new();
   mut root := parser.parse(&mut lexer);
 
+  defer {
+    get_default_allocator().deinit();
+    parser.arena.deinit();
+  }
   bootstrap_builtin_functions(root);
 
   mut interp: Interp;
   interp.run(root);
+
 }

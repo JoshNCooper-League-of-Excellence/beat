@@ -16,12 +16,15 @@ StatementResult :: struct {
 
 impl Interp {
   visit_if :: fn(*mut self, node: *mut Node) -> StatementResult {
-    condition := *self.visit_expression(node.if_node.condition);
-    if condition.is_truthy() {
+    condition := self.visit_expression(node.if_node.condition);
+    if condition.ptr.is_truthy() {
+      condition.deinit();
       return self.visit_statement(node.if_node.block);
     } else if node.if_node.else_node.is_some() {
+      condition.deinit();
       return self.visit_statement(node.if_node.else_node.unwrap());
     }
+    condition.deinit();
     return .{
       control_flow: ControlFlow::None,
       value: None(),
@@ -44,9 +47,12 @@ impl Interp {
     while_node := &mut node.while_node;
     while {
       if while_node.condition.is_some() {
-        if !(*self.visit_expression(while_node.condition.unwrap())).is_truthy() {
+        condition := self.visit_expression(while_node.condition.unwrap());
+        if !condition.ptr.is_truthy() {
+          condition.deinit();
           break;
         }
+        condition.deinit();
       }
 
       for statement in while_node.block.block.statements {
@@ -54,7 +60,7 @@ impl Interp {
         if result.control_flow == ControlFlow::Break {
           return .{
             control_flow: ControlFlow::None,
-            value: None()
+            value: None(),
           };
         } else if result.control_flow == ControlFlow::Continue {
           break;
@@ -71,19 +77,21 @@ impl Interp {
   }
 
   visit_for :: fn(*mut self, node: *mut Node) -> StatementResult {
-    target := *self.visit_expression(node.for_node.target);
-    if target.tag != ValueTag::Array {
+    target := self.visit_expression(node.for_node.target);
+    if target.ptr.tag != ValueTag::Array {
+      target.deinit();
       panic("for loop target must be an array");
       return .{};
     }
 
     identifier := node.for_node.identifier;
-    for element in target.array {
+    defer target.deinit();
+    for element in target.ptr.array {
       option := node.parent.block.scope.symbols.get(identifier);
       if option.is_some() {
         *option.unwrap() = *element;
       } else {
-        node.parent.block.scope.symbols.insert(identifier, element);
+        node.parent.block.scope.symbols.insert(identifier, element.clone());
       }
 
       for statement in node.for_node.block.block.statements {
@@ -91,7 +99,7 @@ impl Interp {
         if result.control_flow == ControlFlow::Break {
           return .{
             control_flow: ControlFlow::None,
-            value: None()
+            value: None(),
           };
         } else if result.control_flow == ControlFlow::Continue {
           break;
@@ -100,6 +108,7 @@ impl Interp {
         }
       }
     }
+
     return .{
       control_flow: ControlFlow::None,
       value: None(),
@@ -107,144 +116,127 @@ impl Interp {
   }
 
   visit_binary :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    switch node.binary.operator {
-      TType::Add: {
-        return self.visit_expression(node.binary.left).add(
-          self.visit_expression(node.binary.right),
-        );
-      }
-      TType::Sub: {
-        return self.visit_expression(node.binary.left).sub(
-          self.visit_expression(node.binary.right),
-        );
-      }
-      TType::Mul: {
-        return self.visit_expression(node.binary.left).mul(
-          self.visit_expression(node.binary.right),
-        );
-      }
-      TType::Div: {
-        return self.visit_expression(node.binary.left).div(
-          self.visit_expression(node.binary.right),
-        );
-      }
-      TType::LT: {
-        return self.visit_expression(node.binary.left).lt(
-          self.visit_expression(node.binary.right)
-        );
-      }
-      TType::LTE: {
-        return self.visit_expression(node.binary.left).lte(
-          self.visit_expression(node.binary.right)
-        );
-      }
-      TType::GT: {
-        return self.visit_expression(node.binary.left).gt(
-          self.visit_expression(node.binary.right),
-        );
-      }
-      TType::GTE: {
-        return self.visit_expression(node.binary.left).gte(
-          self.visit_expression(node.binary.right)
-        );
-      }
-      TType::EQ: {
-        return self.visit_expression(node.binary.left).eq(
-          self.visit_expression(node.binary.right)
-        );
-      }
-      TType::NEQ: {
-        return self.visit_expression(node.binary.left).neq(
-          self.visit_expression(node.binary.right),
-        );
-      }
+    left := self.visit_expression(node.binary.left);
+    left.clone();
+    right := self.visit_expression(node.binary.right);
+    right.clone();
+    result := switch node.binary.operator {
+      TType::Add => left.add(right),
+      TType::Sub => left.sub(right),
+      TType::Mul => left.mul(right),
+      TType::Div => left.div(right),
+      TType::LT => left.lt(right),
+      TType::LTE => left.lte(right),
+      TType::GT => left.gt(right),
+      TType::GTE => left.gte(right),
+      TType::EQ => left.eq(right),
+      TType::NEQ => left.neq(right),
       TType::Assign: {
-        mut left := self.visit_expression(node.binary.left);
-        right := *self.visit_expression(node.binary.right);
-        *left.ptr = right;
-      }
-    }
-    return Value::None();
+        left.deinit();
+        *left.ptr = *right;
+        right.deinit();
+      },
+      else => Value::None(),
+    };
+    left.deinit();
+    right.deinit();
+    return result;
   }
 
   visit_unary :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    operand := *self.visit_expression(node.unary.operand);
-    switch node.unary.operator {
-      TType::Not: {
-        return Rc!<Value>::new(Value.{
-          tag: ValueTag::Boolean,
-          boolean: !operand.is_truthy(),
-        });
-      }
+    operand := self.visit_expression(node.unary.operand);
+    result := switch node.unary.operator {
+      TType::Not => Rc!<Value>::new(Value.{
+        tag: ValueTag::Boolean,
+        boolean: !operand.ptr.is_truthy(),
+      }),
       TType::Sub: {
-        if operand.tag != ValueTag::Number {
+        if operand.ptr.tag != ValueTag::Number {
+          operand.deinit();
           panic("unary minus can only be applied to numbers");
-          return .{};
+          return Value::None();
         }
         return Rc!<Value>::new(Value.{
           tag: ValueTag::Number,
-          number: -operand.number,
+          number: -operand.ptr.number,
         });
-      }
-    }
-    return Value::None();
+      },
+      else => Value::None(),
+    };
+    operand.deinit();
+    return result;
   }
 
   visit_call :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    function := *self.visit_expression(node.call.callee);
+    function := self.visit_expression(node.call.callee);
     mut args: List!<Rc!<Value>>;
     for arg in node.call.arguments {
       value := self.visit_expression(arg);
       args.push(value);
     }
 
-    if function.tag == ValueTag::NativeFunction {
-      return function.native_function(args);
-    } else if function.tag == ValueTag::Function {
-      return self.visit_function(function.function, args);
-    } else {
-      panic("cannot call a non function");
-      return .{};
-    }
+    result := switch function.ptr.tag {
+      ValueTag::NativeFunction => function.ptr.native_function(args),
+      ValueTag::Function => self.visit_function(function.ptr.function, args),
+      else: {
+        function.deinit();
+        panic("cannot call a non function");
+        return Value::None();
+      },
+    };
+    function.deinit();
+    return result;
   }
 
   visit_member_access :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    object := *self.visit_expression(node.member_access.base);
-    if object.tag != ValueTag::Object {
+    object := self.visit_expression(node.member_access.base);
+    if object.ptr.tag != ValueTag::Object {
+      object.deinit();
       panic("cannot access member of a non-object");
-      return .{};
+      return Value::None();
     }
 
     member := node.member_access.member;
-    value := object.object.get(member);
+    value := object.ptr.object.get(member);
     if value.is_none() {
+      object.deinit();
       panic("member not found in object");
-      return .{};
+      return Value::None();
     }
 
-    return value.unwrap().clone();
+    result := value.unwrap();
+    object.deinit();
+    return result;
   }
 
   visit_subscript :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    array := self.visit_expression(node.subscript.base).ptr;
-    if array.tag != ValueTag::Array {
+    array := self.visit_expression(node.subscript.base);
+    if array.ptr.tag != ValueTag::Array {
+      array.deinit();
       panic("cannot subscript a non-array");
-      return .{};
+      return Value::None();
     }
 
-    index := *self.visit_expression(node.subscript.index);
-    if index.tag != ValueTag::Number {
+    index := self.visit_expression(node.subscript.index);
+    if index.ptr.tag != ValueTag::Number {
+      array.deinit();
+      index.deinit();
       panic("array index must be a number");
-      return .{};
+      return Value::None();
     }
 
-    idx := index.number as u64;
-    if idx >= array.array.length {
+    idx := index.ptr.number as u64;
+    if idx >= array.ptr.array.length {
+      array.deinit();
+      index.deinit();
       panic("array index out of bounds");
-      return .{};
+      return Value::None();
     }
 
-    return array.array[idx].clone();
+    result := array.ptr.array[idx].clone();
+    array.deinit();
+    index.deinit();
+    return result;
   }
 
   visit_object_literal :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
@@ -262,7 +254,12 @@ impl Interp {
   }
 
   visit_array_literal :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
-    mut array: List!<Rc!<Value>>;
+    mut array: List!<Rc!<Value>> = .{
+      length: 0,
+      capacity: 0,
+      data: null,
+      allocator: get_default_allocator()
+    };
 
     for element_node in node.array_literal.values {
       value := self.visit_expression(element_node);
@@ -278,7 +275,6 @@ impl Interp {
   visit_block :: fn(*mut self, node: *mut Node) -> StatementResult {
     block := &mut node.block;
     mut cf: ControlFlow = ControlFlow::None;
-
 
     for statement in node.block.statements {
       result := self.visit_statement(statement);
@@ -315,7 +311,7 @@ impl Interp {
       if i >= args.length {
         break;
       }
-      function.block.block.scope.insert(param, args[i]);
+      function.block.block.scope.insert(param, args[i].clone());
       i++;
     }
 
@@ -339,7 +335,7 @@ impl Interp {
   visit_expression :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
     switch node.tag {
       NodeTag::Lambda: {
-        function: *mut Function = new(Function.{});
+        function: *mut Function = get_default_allocator().new_ptr(Function.{});
         function.block = node.lambda.block;
         function.parameters = node.lambda.parameters;
         return Rc!<Value>::new(Value.{
@@ -376,7 +372,7 @@ impl Interp {
           printlnf("use of undeclared variable: %", (node.identifier,));
           panic("");
         }
-        return variable.unwrap().clone();
+        return variable.unwrap();
       }
       NodeTag::Binary: {
         return self.visit_binary(node);

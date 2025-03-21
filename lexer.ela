@@ -4,6 +4,8 @@ import fmt::{
   FormatOptions,
 };
 
+import arena::Arena;
+
 import map::Map;
 
 import fs::File;
@@ -86,10 +88,11 @@ Lexer :: struct {
   position: u32,
 
   keywords: Map!<str, TType>,
+  allocator: *mut Dyn_Allocator,
 }
 
 impl Lexer {
-  new :: fn(path: String) -> #self {
+  new :: fn(allocator: *mut Dyn_Allocator, path: String) -> #self {
     mut keywords: Map!<str, TType>;
 
     keywords.insert("none", TType::None);
@@ -115,7 +118,9 @@ impl Lexer {
       input: File::read_all(path.as_str()).unwrap(),
       location: (path, 0, 0),
       keywords: keywords,
+      allocator: allocator,
     };
+    
   }
 
   advance :: fn(*mut self, new_line: bool) {
@@ -187,7 +192,7 @@ impl Lexer {
         length := end - start - 1;
 
         token.value = Some(String.{
-          data: strndup(self.input.data + start + 1, length),
+          data: self.allocator.copy(self.input.data + start + 1, sizeof(u8), length),
           length: length,
           capacity: length,
         });
@@ -207,7 +212,7 @@ impl Lexer {
         length := end - start;
 
         token.value = Some(String.{
-          data: strndup(self.input.data + start, length),
+          data: self.allocator.copy(self.input.data + start, sizeof(u8), length),
           length: length,
           capacity: length,
         });
@@ -221,7 +226,6 @@ impl Lexer {
         // TODO: we can deinit the string here, but we could just avoid allocating it all together.
         if keyword.is_some() {
           token.type = keyword.unwrap();
-          value.deinit();
           token.value = None();
         }
 
@@ -235,7 +239,7 @@ impl Lexer {
         length := end - start;
 
         token.value = Some(String.{
-          data: strndup(self.input.data + start, length),
+          data:  self.allocator.copy(self.input.data + start, sizeof(u8), length),
           length: length,
           capacity: length,
         });
@@ -268,22 +272,21 @@ impl Lexer {
           break;
         }
 
-
         start := self.position;
         while ispunct(ch) {
           self.get_next_char(&mut ch);
         }
+
         end := self.position;
         length := end - start;
 
         mut value := String.{
-          data: strndup(self.input.data + start, length),
+          data:  self.allocator.copy(self.input.data + start, sizeof(u8), length),
           length: length,
           capacity: length,
         };
 
         token.type = switch value.as_str() {
-          "=" => TType::Assign,
           "<" => TType::LT,
           ">" => TType::GT,
           ">=" => TType::GTE,

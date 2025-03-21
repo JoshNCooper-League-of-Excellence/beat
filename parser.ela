@@ -457,7 +457,7 @@ impl Parser {
     self.parent = node;
 
     block := &mut node.block;
-    block.scope = new(Scope.{});
+    block.scope = get_default_allocator().new_ptr(Scope.{});
 
     while {
       if lexer.peek().type == TType::Eof { break; }

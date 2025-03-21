@@ -144,12 +144,13 @@ impl Scope {
     }
 
     if option.is_some() {
-      option = Some(option.unwrap().clone());
+      v := option.unwrap();
+      option = Some(v.clone());
     }
     return option;
   }
   create_child :: fn(*mut self) -> *mut Scope {
-    return new(Scope.{
+    return get_default_allocator().new_ptr(Scope.{
       parent: Some(self),
     });
   }
