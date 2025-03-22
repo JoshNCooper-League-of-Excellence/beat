@@ -1,5 +1,11 @@
 {
   "files.exclude": {
     "**/main": true,
-  }
+  },
+  "files.associations": {
+    "*.beat": "javascript",
+  },
+   "javascript.validate.enable": false,
+   "javascript.suggest.enabled": false,
+   "javascript.format.enable": true,
 }
