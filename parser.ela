@@ -14,6 +14,7 @@ impl Parser {
       message: format("parse error: %", (msg,), FormatOptions::default()),
     };
     error.print();
+    exit(1);
   }
 
   new :: fn() -> #self {
