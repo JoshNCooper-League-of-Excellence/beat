@@ -271,6 +271,7 @@ NodeTag :: enum {
 
 Node :: struct {
   tag: NodeTag,
+  location: SourceLocation,
   #anon :: union {
     boolean: bool,
     number: f64,

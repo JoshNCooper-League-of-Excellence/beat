@@ -24,13 +24,12 @@ impl Parser {
     };
   }
 
-  new_node :: fn(*mut self, node: Node) -> *mut Node {
+  new_node :: fn(*mut self, node: Node, token: Token) -> *mut Node {
     mem : *mut Node = self.arena.allocate(sizeof(Node));
     *mem = node;
-  
+    mem.location = token.location;
     return mem;
   }
-
 
   parse_primary :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
     token := lexer.peek();
@@ -40,7 +39,7 @@ impl Parser {
         node := self.new_node(Node.{
           tag: NodeTag::Lambda,
           lambda: .{}
-        });
+        }, token);
 
         lambda := &mut node.lambda;
 
@@ -70,7 +69,7 @@ impl Parser {
           object_literal: .{
             key_values: values,
           }
-        });
+        }, token);
       }
       TType::OpenBracket: {
         lexer.eat();
@@ -87,48 +86,48 @@ impl Parser {
           array_literal: .{
             values: values,
           }
-        });
+        }, token);
       }
       TType::Number: {
         lexer.eat();
         return self.new_node(.{
           tag: NodeTag::Number,
           number: atof(token.value.unwrap().data),
-        });
+        }, token);
       }
       TType::True: {
         lexer.eat();
         return self.new_node(.{
           tag: NodeTag::Boolean,
           boolean: true,
-        });
+        }, token);
       }
       TType::None: {
         lexer.eat();
         return self.new_node(.{
           tag: NodeTag::None,
-        });
+        }, token);
       }
       TType::False: {
         lexer.eat();
         return self.new_node(.{
           tag: NodeTag::Boolean,
           boolean: false,
-        });
+        }, token);
       }
       TType::String: {
         lexer.eat();
         return self.new_node(.{
           tag: NodeTag::String,
           string: token.value.unwrap(),
-        });
+        }, token);
       }
       TType::Identifier: {
         lexer.eat();
         return self.new_node(.{
           tag: NodeTag::Identifier,
           identifier: token.value.unwrap(),
-        });
+        }, token);
       }
       TType::OpenParen: {
         lexer.eat();
@@ -170,7 +169,7 @@ impl Parser {
               callee: node,
               arguments: arguments,
             },
-          });
+          }, token);
         }
         TType::OpenBracket: {
           lexer.eat();
@@ -182,7 +181,7 @@ impl Parser {
               base: node,
               index: index,
             },
-          });
+          }, token);
         }
         TType::Dot: {
           lexer.eat();
@@ -193,7 +192,7 @@ impl Parser {
               base: node,
               member: member,
             },
-          });
+          }, token);
         }
         else: { break; }
       }
@@ -212,7 +211,7 @@ impl Parser {
           operand: operand,
           operator: token.type,
         },
-      });
+      }, token);
     }
     return self.parse_postfix(lexer);
   }
@@ -233,7 +232,7 @@ impl Parser {
           operator: token.type,
         },
       };
-      left = self.new_node(node);
+      left = self.new_node(node, token);
     }
     return left;
   }
@@ -251,16 +250,16 @@ impl Parser {
     name := lexer.expect(TType::Identifier).value.unwrap();
 
     if lexer.peek().type == TType::Semi {
-      lexer.eat();
+      token := lexer.eat();
       return self.new_node(.{
         tag: NodeTag::Variable,
         variable: .{
           name: name,
           value: None(),
         }
-      });
+      }, token);
     } else {
-      lexer.expect(TType::Assign);
+      token := lexer.expect(TType::Assign);
       value := Some(self.parse_expression(lexer));
       lexer.expect(TType::Semi);
       return self.new_node(.{
@@ -269,12 +268,12 @@ impl Parser {
           name: name,
           value: value,
         }
-      });
+      }, token);
     }
   }
 
   parse_if :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
-    lexer.expect(TType::If);
+    token := lexer.expect(TType::If);
     condition := self.parse_expression(lexer);
     block := self.parse_block(lexer);
 
@@ -290,11 +289,11 @@ impl Parser {
         block: block,
         else_node: else_node
       }
-    });
+    }, token);
   }
 
   parse_else :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
-    lexer.expect(TType::Else);
+    token := lexer.expect(TType::Else);
 
     if lexer.peek().type == TType::If {
       if_node := Some(self.parse_if(lexer));
@@ -303,7 +302,7 @@ impl Parser {
         else_node: .{
           if_node: if_node,
         }
-      });
+      }, token);
     } else {
       block := Some(self.parse_block(lexer));
       return self.new_node(.{
@@ -311,12 +310,12 @@ impl Parser {
         else_node: .{
           block: block,
         }
-      });
+      }, token);
     }
   }
 
   parse_while :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
-    lexer.expect(TType::While);
+    token := lexer.expect(TType::While);
     mut condition: Option!<*mut Node> = None();
     if lexer.peek().type != TType::OpenCurly {
       condition = Some(self.parse_expression(lexer));
@@ -328,11 +327,11 @@ impl Parser {
         condition: condition,
         block: block
       }
-    });
+    }, token);
   }
 
   parse_for :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
-    lexer.expect(TType::For);
+    token := lexer.expect(TType::For);
     identifier := lexer.expect(TType::Identifier).value.unwrap();
     lexer.expect(TType::In);
     target := self.parse_expression(lexer);
@@ -345,18 +344,18 @@ impl Parser {
         target: target,
         block: block
       }
-    });
+    }, token);
   }
 
   parse_block :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
-    lexer.expect(TType::OpenCurly);
+    token := lexer.expect(TType::OpenCurly);
 
     mut statements: List!<*mut Node>;
 
     node := self.new_node(.{
       tag: NodeTag::Block,
       block: .{},
-    });
+    }, token);
 
     block := &mut node.block;
 
@@ -371,7 +370,7 @@ impl Parser {
   }
 
   parse_function :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
-    lexer.expect(TType::Fn);
+    token := lexer.expect(TType::Fn);
     name := lexer.expect(TType::Identifier).value.unwrap();
     lexer.expect(TType::OpenParen);
     mut parameters: List!<String>;
@@ -394,7 +393,7 @@ impl Parser {
         parameters: parameters,
         block: block,
       }
-    });
+    }, token);
   }
 
   parse_statement :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
@@ -417,7 +416,7 @@ impl Parser {
         return self.parse_function(lexer);
       }
       TType::Return: {
-        lexer.eat();
+        token := lexer.eat();
         mut expression: Option!<*mut Node> = None();
         if lexer.peek().type != TType::Semi {
           expression = Some(self.parse_expression(lexer));
@@ -428,21 +427,21 @@ impl Parser {
           return_node: .{
           expression: expression,
           }
-        });
+        }, token);
       }
       TType::Continue: {
-        lexer.eat();
+        token := lexer.eat();
         lexer.expect(TType::Semi);
         return self.new_node(.{
           tag: NodeTag::Continue,
-        });
+        }, token);
       }
       TType::Break: {
-        lexer.eat();
+        token := lexer.eat();
         lexer.expect(TType::Semi);
         return self.new_node(.{
           tag: NodeTag::Break,
-        });
+        }, token);
       }
       else: {
         node := self.parse_expression(lexer);
@@ -456,11 +455,11 @@ impl Parser {
 
   parse :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
     mut statements: List!<*mut Node>;
-
+    token := lexer.peek();
     node := self.new_node(.{
       tag: NodeTag::Block,
       block: .{},
-    });
+    }, token);
     
     block := &mut node.block;
 
