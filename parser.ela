@@ -7,15 +7,16 @@ Parser :: struct {
   parent: *mut Node,
 }
 
+parse_error :: fn(msg: str, location: SourceLocation) {
+  error := LexError.{
+    location: location,
+    message: format("parse error: %", (msg,), FormatOptions::default()),
+  };
+  error.print();
+  exit(1);
+}
+
 impl Parser {
-  parse_error :: fn(self, msg: str, token: Token) {
-    error := LexError.{
-      location: token.location,
-      message: format("parse error: %", (msg,), FormatOptions::default()),
-    };
-    error.print();
-    exit(1);
-  }
 
   new :: fn() -> #self {
     return .{
@@ -136,7 +137,7 @@ impl Parser {
         return node;
       }
       else: {
-        self.parse_error("invalid primary expression", token);
+        parse_error("invalid primary expression", token.location);
       }
     }
     return null;
@@ -449,7 +450,7 @@ impl Parser {
         return node;
       }
     }
-    self.parse_error("invalid statement", token);
+    parse_error("invalid statement", token.location);
     return null;
   }
 

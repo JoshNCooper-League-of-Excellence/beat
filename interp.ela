@@ -102,9 +102,8 @@ impl Interp {
 
   visit_for :: fn(*mut self, node: *mut Node) -> StatementResult {
     target := self.visit_expression(node.for_node.target);
-    if target.ptr.tag != ValueTag::Array {
+    if target.ptr.tag != ValueTag::Array && target.ptr.tag != ValueTag::String {
       target.deinit();
-      panic("for loop target must be an array");
       return .{};
     }
 
@@ -116,25 +115,66 @@ impl Interp {
       self.release_scope(old_scope);
     }
 
-    for element in target.ptr.array {
-      option := self.scope.symbols.get(identifier);
-      if option.is_some() {
-        *option.unwrap() = *element;
-      } else {
-        self.scope.symbols.insert(identifier, element.clone());
-      }
+    if target.ptr.tag == ValueTag::Array {
+      for element in target.ptr.array {
+        option := self.scope.symbols.get(identifier);
+        if option.is_some() {
+          *option.unwrap() = *element;
+        } else {
+          self.scope.symbols.insert(identifier, element.clone());
+        }
 
-      for statement in node.for_node.block.block.statements {
-        result := self.visit_statement(statement);
-        if result.control_flow == ControlFlow::Break {
-          return .{
-            control_flow: ControlFlow::None,
-            value: None(),
-          };
-        } else if result.control_flow == ControlFlow::Continue {
-          break;
-        } else if result.control_flow == ControlFlow::Return {
-          return result;
+        for statement in node.for_node.block.block.statements {
+          result := self.visit_statement(statement);
+          if result.control_flow == ControlFlow::Break {
+            return .{
+              control_flow: ControlFlow::None,
+              value: None(),
+            };
+          } else if result.control_flow == ControlFlow::Continue {
+            break;
+          } else if result.control_flow == ControlFlow::Return {
+            return result;
+          }
+        }
+      }
+    } else if target.ptr.tag == ValueTag::String {
+      for ch in target.ptr.string {
+        option := self.scope.symbols.get(identifier);
+
+        mut data: u8[2];
+        data[0] = ch;
+        data[1] = '\0';
+
+        string := String.{
+          data: data,
+          length: 1,
+          capacity: 1,
+        };
+
+        value_string := Value.{
+          tag: ValueTag::String,
+          string: string,
+        };
+
+        if option.is_some() {
+          *option.unwrap() =  value_string;
+        } else {
+          self.scope.symbols.insert(identifier, Rc!<Value>::new(value_string));
+        }
+
+        for statement in node.for_node.block.block.statements {
+          result := self.visit_statement(statement);
+          if result.control_flow == ControlFlow::Break {
+            return .{
+              control_flow: ControlFlow::None,
+              value: None(),
+            };
+          } else if result.control_flow == ControlFlow::Continue {
+            break;
+          } else if result.control_flow == ControlFlow::Return {
+            return result;
+          }
         }
       }
     }
@@ -331,8 +371,7 @@ impl Interp {
     };
   }
 
-  visit_function :: fn(*mut self, node: *mut Node, args: List!<Rc!<Value>>) -> Rc!<Value> {
-    function : *mut Function = &mut node.function;
+  visit_function :: fn(*mut self, function: *mut Function, args: List!<Rc!<Value>>) -> Rc!<Value> {
     old_scope := self.enter_scope();
 
     defer {

@@ -1,0 +1,105 @@
+import fs::File;
+
+#export stdin: *mut fs::FILE;
+#foreign fgets :: fn(buffer: *mut u8, length: s32, stream: *mut fs::FILE) -> *mut u8;
+
+#c_flags " -lm "
+#foreign fmod :: fn(a: f64, b: f64) -> s32;
+
+bootstrap_builtin_functions :: fn(interp: *mut Interp, alloc: *mut Dyn_Allocator) {
+  interp.scope.insert("print".to_string(alloc), Rc!<Value>::new(Value.{
+    tag: ValueTag::NativeFunction,
+    native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
+      mut builder: StringBuilder;
+      options := FormatOptions::default();
+      for arg in args {
+        (*arg).format(&mut builder, options);
+        builder.append(" ");
+      }
+      mut string := builder.get_string();
+      println(string);
+      string.deinit();
+      builder.deinit();
+    }
+  }));
+
+  interp.scope.insert("mod".to_string(alloc), Rc!<Value>::new(Value.{
+    tag: ValueTag::NativeFunction,
+    native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
+      if args.length != 2 {
+        return Value::None();
+      }
+      a := args[0].ptr.number;
+      b := args[1].ptr.number;
+      result := fmod(a as f32, b as f32);
+      return Rc!<Value>::new(Value.{
+        tag: ValueTag::Number,
+        number: result,
+      });
+    }
+  }));
+
+  interp.scope.insert("range".to_string(alloc), Rc!<Value>::new(Value.{
+    tag: ValueTag::NativeFunction,
+    native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
+      if args.length < 2 {
+        return Value::None();
+      }
+      min := args[0].ptr.number;
+      max := args[1].ptr.number;
+      mut increment := 1.0;
+      if args.length > 2 {
+        increment = args[2].ptr.number;
+      }
+      count := ((max - min) / increment) as u64;
+      mut array: List!<Rc!<Value>>;
+      for i in 0..count {
+        array.push(Rc!<Value>::new(Value.{
+          tag: ValueTag::Number,
+          number: min + (i as f64) * increment,
+        }));
+      }
+      return Rc!<Value>::new(Value.{
+        tag: ValueTag::Array,
+        array: array,
+      });
+    }
+  }));
+
+  interp.scope.insert("fread".to_string(alloc), Rc!<Value>::new(Value.{
+    tag: ValueTag::NativeFunction,
+    native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
+      path := args[0].ptr.string;
+      data := File::read_all(path.as_str()).unwrap();
+      return Rc!<Value>::new(
+        Value.{
+          tag: ValueTag::String,
+          string: data
+        }
+      );
+    }
+  }));
+
+  interp.scope.insert("getchar".to_string(alloc), Rc!<Value>::new(Value.{
+    tag: ValueTag::NativeFunction,
+    native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
+      mut buffer: u8[2048];
+
+      fgets(buffer, 2048, stdin);
+
+      // Remove the newline character if present
+      mut length := strlen(buffer);
+
+      if length > 0 && buffer[length - 1] == '\n' {
+        buffer[length - 1] = '\0';
+      }
+
+      return Rc!<Value>::new(
+        Value.{
+          tag: ValueTag::String,
+          string: String::from_ptr(buffer)
+        }
+      );
+    }
+  }));
+}
