@@ -102,6 +102,13 @@ impl Value {
     });
   }
 
+  Number :: fn(value: f64) -> Rc!<#self> {
+    return Rc!<Value>::new(Value.{
+      tag: ValueTag::Number,
+      number: value,
+    });
+  }
+
   is_truthy :: fn(self) -> bool {
     return switch self.tag {
       ValueTag::None => false,
