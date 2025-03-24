@@ -223,7 +223,7 @@ impl Interp {
       TType::Sub: {
         if operand.ptr.tag != ValueTag::Number {
           operand.deinit();
-          panic("unary minus can only be applied to numbers");
+          parse_error("unary minus can only be applied to numbers", node.location);
           return Value::None();
         }
         return Rc!<Value>::new(Value.{
@@ -251,7 +251,7 @@ impl Interp {
       ValueTag::NativeFunction => function.ptr.native_function(args),
       ValueTag::Function => self.visit_function(function.ptr.function, args),
       else: {
-        panic("cannot call a non function");
+        parse_error("cannot call a non function", node.location);
         return Value::None();
       },
     };
@@ -263,14 +263,14 @@ impl Interp {
     defer object.deinit();
 
     if object.ptr.tag != ValueTag::Object {
-      panic("cannot access member of a non-object");
+      parse_error("cannot access member of a non-object", node.location);
       return Value::None();
     }
 
     member := node.member_access.member;
     value := object.ptr.object.get(member);
     if value.is_none() {
-      panic("member not found in object");
+      parse_error("member not found in object", node.location);
       return Value::None();
     }
 
@@ -530,7 +530,7 @@ impl Interp {
         return self.visit_variable(node);
       }
     }
-    panic("invalid node");
+    parse_error("invalid node", node.location);
     return .{};
   }
 
