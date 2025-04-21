@@ -1,12 +1,12 @@
 import fs::File;
 
 #export stdin: *mut fs::FILE;
-#foreign fgets :: fn(buffer: *mut u8, length: s32, stream: *mut fs::FILE) -> *mut u8;
+#foreign fn fgets(buffer: *mut u8, length: s32, stream: *mut fs::FILE) -> *mut u8;
 
 #c_flags " -lm "
-#foreign fmod :: fn(a: f64, b: f64) -> s32;
+#foreign fn fmod(a: f64, b: f64) -> s32;
 
-bootstrap_builtin_functions :: fn(interp: *mut Interp, alloc: *mut Dyn_Allocator) {
+fn bootstrap_builtin_functions(interp: *mut Interp, alloc: *mut Dyn_Allocator) {
   interp.scope.insert("print".to_string(alloc), Rc!<Value>::new(Value.{
     tag: ValueTag::NativeFunction,
     native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
@@ -107,10 +107,20 @@ bootstrap_builtin_functions :: fn(interp: *mut Interp, alloc: *mut Dyn_Allocator
     tag: ValueTag::NativeFunction,
     native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
       arg := args[0].clone();
-
       return switch arg.ptr.tag {
         ValueTag::Array => Value::Number(arg.ptr.array.length),
         ValueTag::String => Value::Number(arg.ptr.string.length),
+      }
+    }
+  }));
+
+  interp.scope.insert("clone".to_string(alloc), Rc!<Value>::new(Value.{
+    tag: ValueTag::NativeFunction,
+    native_function: fn(args: List!<Rc!<Value>>) -> Rc!<Value> {
+      if args.is_empty() {
+        return Value::None();
+      } else {
+        return Value::clone(*args[0].ptr);
       }
     }
   }));

@@ -2,12 +2,12 @@ import ast::*;
 import arena::*;
 import fmt::*;
 
-Parser :: struct {
+struct Parser {
   arena: Arena,
   parent: *mut Node,
 }
 
-parse_error :: fn(msg: str, location: SourceLocation) {
+fn parse_error(msg: str, location: SourceLocation) {
   error := LexError.{
     location: location,
     message: format("parse error: %", (msg,), FormatOptions::default()),
@@ -18,23 +18,23 @@ parse_error :: fn(msg: str, location: SourceLocation) {
 
 impl Parser {
 
-  new :: fn() -> #self {
+  fn new() -> Self {
     return .{
       arena: Arena::new(8192, ArenaFlags::Align),
     };
   }
 
-  new_node :: fn(*mut self, node: Node, token: Token) -> *mut Node {
+  fn new_node(*mut self, node: Node, token: Token) -> *mut Node {
     mem : *mut Node = self.arena.allocate(sizeof(Node));
     *mem = node;
     mem.location = token.location;
     return mem;
   }
 
-  parse_primary :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
+  fn parse_primary(*mut self, lexer: *mut Lexer) -> *mut Node {
     token := lexer.peek();
     switch token.type {
-      TType::Fn: {
+      Fn TType: {
         lexer.eat();
         node := self.new_node(Node.{
           tag: NodeTag::Lambda,
@@ -136,13 +136,13 @@ impl Parser {
         return node;
       }
       else: {
-        parse_error("invalid primary expression", token.location);
+        parse_error(format("invalid primary expression :: %", (token.type,), FormatOptions::default()).as_str(), token.location);
       }
     }
     return null;
   }
 
-  parse_postfix :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
+  fn parse_postfix(*mut self, lexer: *mut Lexer) -> *mut Node {
     mut node := self.parse_primary(lexer);
     while {
       token := lexer.peek();
@@ -200,7 +200,7 @@ impl Parser {
     return node;
   }
 
-  parse_unary :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
+  fn parse_unary(*mut self, lexer: *mut Lexer) -> *mut Node {
     token := lexer.peek();
     if token.type == TType::Not || token.type == TType::Sub {
       lexer.eat();
@@ -216,7 +216,7 @@ impl Parser {
     return self.parse_postfix(lexer);
   }
 
-  parse_binary :: fn(*mut self, lexer: *mut Lexer, mut left: *mut Node, precedence: Precedence) -> *mut Node {
+  fn parse_binary(*mut self, lexer: *mut Lexer, mut left: *mut Node, precedence: Precedence) -> *mut Node {
     while {
       token := lexer.peek();
       token_precedence := Precedence::get(token.type);
@@ -237,15 +237,15 @@ impl Parser {
     return left;
   }
 
-  parse_expression_impl :: fn(*mut self, lexer: *mut Lexer, precedence: Precedence) -> *mut Node {
+  fn parse_expression_impl(*mut self, lexer: *mut Lexer, precedence: Precedence) -> *mut Node {
     return self.parse_binary(lexer, self.parse_unary(lexer), precedence);
   }
 
-  parse_expression :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
+  fn parse_expression(*mut self, lexer: *mut Lexer) -> *mut Node {
     return self.parse_expression_impl(lexer, Precedence::Lowest);
   }
 
-  parse_variable :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
+  fn parse_variable(*mut self, lexer: *mut Lexer) -> *mut Node {
     lexer.expect(TType::Var);
     name := lexer.expect(TType::Identifier).value.unwrap();
 
@@ -272,7 +272,7 @@ impl Parser {
     }
   }
 
-  parse_if :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
+  fn parse_if(*mut self, lexer: *mut Lexer) -> *mut Node {
     token := lexer.expect(TType::If);
     condition := self.parse_expression(lexer);
     block := self.parse_block(lexer);
@@ -292,7 +292,7 @@ impl Parser {
     }, token);
   }
 
-  parse_else :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
+  fn parse_else(*mut self, lexer: *mut Lexer) -> *mut Node {
     token := lexer.expect(TType::Else);
 
     if lexer.peek().type == TType::If {
@@ -314,7 +314,7 @@ impl Parser {
     }
   }
 
-  parse_while :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
+  fn parse_while(*mut self, lexer: *mut Lexer) -> *mut Node {
     token := lexer.expect(TType::While);
     mut condition: Option!<*mut Node> = None();
     if lexer.peek().type != TType::OpenCurly {
@@ -330,7 +330,7 @@ impl Parser {
     }, token);
   }
 
-  parse_for :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
+  fn parse_for(*mut self, lexer: *mut Lexer) -> *mut Node {
     token := lexer.expect(TType::For);
     identifier := lexer.expect(TType::Identifier).value.unwrap();
     lexer.expect(TType::In);
@@ -347,7 +347,7 @@ impl Parser {
     }, token);
   }
 
-  parse_block :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
+  fn parse_block(*mut self, lexer: *mut Lexer) -> *mut Node {
     token := lexer.expect(TType::OpenCurly);
 
     mut statements: List!<*mut Node>;
@@ -369,8 +369,8 @@ impl Parser {
     return node;
   }
 
-  parse_function :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
-    token := lexer.expect(TType::Fn);
+  fn parse_function(*mut self, lexer: *mut Lexer) -> *mut Node {
+    token := lexer.expect(Fn TType);
     name := lexer.expect(TType::Identifier).value.unwrap();
     lexer.expect(TType::OpenParen);
     mut parameters: List!<String>;
@@ -396,7 +396,7 @@ impl Parser {
     }, token);
   }
 
-  parse_statement :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
+  fn parse_statement(*mut self, lexer: *mut Lexer) -> *mut Node {
     token := lexer.peek();
     switch token.type {
       TType::Var: {
@@ -412,7 +412,7 @@ impl Parser {
         return self.parse_for(lexer);
       }
 
-      TType::Fn: {
+      Fn TType: {
         return self.parse_function(lexer);
       }
       TType::Return: {
@@ -453,7 +453,7 @@ impl Parser {
     return null;
   }
 
-  parse :: fn(*mut self, lexer: *mut Lexer) -> *mut Node {
+  fn parse(*mut self, lexer: *mut Lexer) -> *mut Node {
     mut statements: List!<*mut Node>;
     token := lexer.peek();
     node := self.new_node(.{

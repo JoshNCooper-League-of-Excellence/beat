@@ -3,7 +3,7 @@ import lexer::*;
 import rc::*;
 import map::Map;
 
-Precedence :: enum {
+enum Precedence {
   Lowest,
   Assignment,  // =
   Conditional, // ?:
@@ -23,7 +23,7 @@ Precedence :: enum {
 }
 
 impl Precedence {
-  get :: fn(type: TType) -> #self {
+  fn get(type: TType) -> Self {
     if type == TType::Assign {
       return Precedence::Assignment;
     } else if type == TType::LT || type == TType::LTE || type == TType::GT || type == TType::GTE {
@@ -44,7 +44,7 @@ impl Precedence {
   }
 }
 
-ValueTag :: enum {
+enum ValueTag {
   Invalid,
   None,
   Number,
@@ -56,10 +56,10 @@ ValueTag :: enum {
   NativeFunction,
 }
 
-Value :: struct;
-alias NativeFunction :: fn *(List!<Rc!<Value>>) -> Rc!<Value>;
+struct Value;
+alias NativeFunction :: fn*(List!<Rc!<Value>>) -> Rc!<Value>;
 
-Value :: struct {
+struct Value {
   tag: ValueTag,
   #anon :: union {
     number: f64,
@@ -73,43 +73,43 @@ Value :: struct {
 }
 
 impl Value {
-  None :: fn() -> Rc!<#self> {
-    #static mut none: Rc!<#self>;
+  fn None() -> Rc!<Self> {
+    #static mut none: Rc!<Self>;
     if none.ptr == null {
       none = Rc!<Value>::new(Value.{});
     }
     return none;
   }
 
-  True :: fn() -> Rc!<#self> {
+  fn True() -> Rc!<Self> {
     return Rc!<Value>::new(Value.{
       tag: ValueTag::Boolean,
       boolean: true,
     });
   }
 
-  False :: fn() -> Rc!<#self> {
+  fn False() -> Rc!<Self> {
     return Rc!<Value>::new(Value.{
       tag: ValueTag::Boolean,
       boolean: false,
     });
   }
 
-  Bool :: fn(value: bool) -> Rc!<#self> {
+  fn Bool(value: bool) -> Rc!<Self> {
     return Rc!<Value>::new(Value.{
       tag: ValueTag::Boolean,
       boolean: value,
     });
   }
 
-  Number :: fn(value: f64) -> Rc!<#self> {
+  fn Number(value: f64) -> Rc!<Self> {
     return Rc!<Value>::new(Value.{
       tag: ValueTag::Number,
       number: value,
     });
   }
 
-  is_truthy :: fn(self) -> bool {
+  fn is_truthy(self) -> bool {
     return switch self.tag {
       ValueTag::None => false,
       ValueTag::Number => self.number != 0.0,
@@ -121,15 +121,49 @@ impl Value {
       ValueTag::NativeFunction => true,
     };
   }
+
+
+  fn clone(self) -> Rc!<Self> {
+    mut value := Value.{
+      tag: self.tag,
+    };
+    switch self.tag {
+      ValueTag::Number: {
+        value.number = self.number;
+      }
+      ValueTag::String: {
+        value.string = self.string.clone();
+      }
+      ValueTag::Boolean: {
+        value.boolean = self.boolean;
+      }
+      ValueTag::Object: {
+        value.object = .{};
+        for k, v in self.object {
+          value.object.insert(k.clone(), v.clone());
+        }
+      }
+      ValueTag::Array: {
+        value.array = self.array.clone();
+      }
+      ValueTag::Function: {
+        value.function = self.function;
+      }
+      ValueTag::NativeFunction: {
+        value.native_function = self.native_function;
+      }
+    }
+    return Rc!<Value>::new(value);
+  }
 }
 
-Scope :: struct {
+struct Scope {
   parent: Option!<*mut Scope>,
   symbols: Map!<String, Rc!<Value>>,
 }
 
 impl Scope {
-  insert :: fn(*mut self, key: String, value: Rc!<Value>) {
+  fn insert(*mut self, key: String, value: Rc!<Value>) {
     mut node := self;
     while {
       option := node.symbols.get_mut(key);
@@ -144,7 +178,7 @@ impl Scope {
     }
     self.symbols.insert(key, value.clone());
   }
-  lookup :: fn(*const self, key: String) -> Option!<Rc!<Value>> {
+  fn lookup(*const self, key: String) -> Option!<Rc!<Value>> {
     mut option := self.symbols.get(key);
     if option.is_none() && self.parent.is_some() {
       return self.parent.unwrap().lookup(key);
@@ -156,96 +190,96 @@ impl Scope {
     }
     return option;
   }
-  create_child :: fn(*mut self) -> *mut Scope {
+  fn create_child(*mut self) -> *mut Scope {
     return get_default_allocator().new_ptr(Scope.{
       parent: Some(self),
     });
   }
 }
 
-Node :: struct;
+struct Node;
 
-Unary :: struct {
+struct Unary {
   operand: *mut Node,
   operator: TType,
 }
 
-Binary :: struct {
+struct Binary {
   left: *mut Node,
   right: *mut Node,
   operator: TType,
 }
 
-MemberAccess :: struct {
+struct MemberAccess {
   base: *mut Node,
   member: String,
 }
 
-Subscript :: struct {
+struct Subscript {
   base: *mut Node,
   index: *mut Node,
 }
 
-Call :: struct {
+struct Call {
   callee: *mut Node,
   arguments: List!<*mut Node>
 }
 
-ObjectLiteral :: struct {
+struct ObjectLiteral {
   key_values: Map!<String, *mut Node>,
 }
 
-ArrayLiteral :: struct {
+struct ArrayLiteral {
   values: List!<*mut Node>,
 }
 
-Block :: struct {
+struct Block {
   statements: List!<*mut Node>,
 }
 
-Function :: struct {
+struct Function {
   name: String,
-  parameters: String[],
+  parameters: List!<String>,
   block: *mut Node,
 }
 
-Lambda :: struct {
-  parameters: String[],
+struct Lambda {
+  parameters: List!<String>,
   block: *mut Node,
 }
 
-If :: struct {
+struct If {
   condition: *mut Node,
   block: *mut Node,
   else_node: Option!<*mut Node>,
 }
 
-Else :: struct {
+struct Else {
   if_node: Option!<*mut Node>,
   block: Option!<*mut Node>,
 }
 
-While :: struct {
+struct While {
   condition: Option!<*mut Node>,
   block: *mut Node,
 }
 
-For :: struct {
+struct For {
   target: *mut Node,
   identifier: String,
   block: *mut Node,
 }
 
-Return :: struct {
+struct Return {
   expression: Option!<*mut Node>
 }
 
-Variable :: struct {
+struct Variable {
   name: String,
   value: Option!<*mut Node>,
 }
 
-NodeTag :: enum {
+enum NodeTag {
   None, // 'none' value, not an invalid ntag.
   Boolean,
   Number,
@@ -276,7 +310,7 @@ NodeTag :: enum {
   Lambda,
 }
 
-Node :: struct {
+struct Node {
   tag: NodeTag,
   location: SourceLocation,
   #anon :: union {
@@ -309,7 +343,7 @@ Node :: struct {
 }
 
 impl Format for Value {
-  format :: fn(*const self, builder: *mut StringBuilder, options: FormatOptions) {
+  fn format(*const self, builder: *mut StringBuilder, options: FormatOptions) {
     switch self.tag {
       ValueTag::None: {
         builder.append("none");
@@ -374,14 +408,14 @@ impl Format for Value {
         builder.append(")");
       }
       ValueTag::NativeFunction: {
-        builder.append("@builtin::fn()");
+        builder.append("@fn builtin()");
       }
     }
   }
 }
 
 impl Rc!<Value> {
-  eq :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+  fn eq(self, other: Rc!<Value>) -> Rc!<Value> {
     if self.ptr.tag != other.ptr.tag {
       return Value::False();
     } 
@@ -392,20 +426,21 @@ impl Rc!<Value> {
       ValueTag::String => Value::Bool(self.ptr.string == other.ptr.string),
       ValueTag::Boolean => Value::Bool(self.ptr.boolean == other.ptr.boolean),
       ValueTag::Object: {
-        if self.ptr.object.length != other.ptr.object.length {
-          return Value::False();
-        } else {
-          for key, value in self.ptr.object {
-            if !other.ptr.object.contains(key) {
-              return Value::False();
-            }
-            other_value := other.ptr.object.get(key).unwrap();
-            if !value.eq(other_value).ptr.boolean {
-              return Value::False();
-            }
-          }
-          return Value::True();
-        }
+        return Value::Bool(self.ptr == other.ptr);
+        // if self.ptr.object.length != other.ptr.object.length {
+        //   return Value::False();
+        // } else {
+        //   for key, value in self.ptr.object {
+        //     if !other.ptr.object.contains(key) {
+        //       return Value::False();
+        //     }
+        //     other_value := other.ptr.object.get(key).unwrap();
+        //     if !value.eq(other_value).ptr.boolean {
+        //       return Value::False();
+        //     }
+        //   }
+        //   return Value::True();
+        // }
       }
       ValueTag::Array: {
         if self.ptr.array.length != other.ptr.array.length {
@@ -424,13 +459,13 @@ impl Rc!<Value> {
     }
     return Value::False();
   }
-  neq :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+  fn neq(self, other: Rc!<Value>) -> Rc!<Value> {
     return Value::Bool(!self.eq(other).ptr.boolean);
   }
 }
 
 impl Rc!<Value> {
-  add :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+  fn add(self, other: Rc!<Value>) -> Rc!<Value> {
     if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
         tag: ValueTag::Number,
@@ -459,7 +494,7 @@ impl Rc!<Value> {
     }
   }
 
-  sub :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+  fn sub(self, other: Rc!<Value>) -> Rc!<Value> {
     if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
         tag: ValueTag::Number,
@@ -471,7 +506,7 @@ impl Rc!<Value> {
     }
   }
 
-  mul :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+  fn mul(self, other: Rc!<Value>) -> Rc!<Value> {
     if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
         tag: ValueTag::Number,
@@ -483,7 +518,7 @@ impl Rc!<Value> {
     }
   }
 
-  div :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+  fn div(self, other: Rc!<Value>) -> Rc!<Value> {
     if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       if other.ptr.number == 0.0 {
         panic("division by zero");
@@ -499,7 +534,7 @@ impl Rc!<Value> {
     }
   }
 
-  lt :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+  fn lt(self, other: Rc!<Value>) -> Rc!<Value> {
     if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
         tag: ValueTag::Boolean,
@@ -511,7 +546,7 @@ impl Rc!<Value> {
     }
   }
 
-  lte :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+  fn lte(self, other: Rc!<Value>) -> Rc!<Value> {
     if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
         tag: ValueTag::Boolean,
@@ -523,7 +558,7 @@ impl Rc!<Value> {
     }
   }
 
-  gt :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+  fn gt(self, other: Rc!<Value>) -> Rc!<Value> {
     if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
         tag: ValueTag::Boolean,
@@ -535,7 +570,7 @@ impl Rc!<Value> {
     }
   }
 
-  gte :: fn(self, other: Rc!<Value>) -> Rc!<Value> {
+  fn gte(self, other: Rc!<Value>) -> Rc!<Value> {
     if self.ptr.tag == ValueTag::Number && other.ptr.tag == ValueTag::Number {
       return Rc!<Value>::new(Value.{
         tag: ValueTag::Boolean,

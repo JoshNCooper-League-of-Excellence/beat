@@ -1,1 +1,31 @@
 
+fn last(value) {
+  var index = len(value) - 1;
+  return value[index];
+}
+
+var object = {
+  key = "Hello, World",
+  value = 10,
+};
+
+var cloned = clone(object);
+
+print(object, cloned, "are equal?", object == cloned);
+
+var value = [5, 3, 1, -100, 20, 600, -200, 100];
+
+var smallest = last(value);
+
+print("starting with:", smallest);
+
+for value in value {
+  if value < smallest {
+    print("got new smallest:", value);
+    smallest = value;
+  }
+}
+
+print(smallest);
+
+// delete value;

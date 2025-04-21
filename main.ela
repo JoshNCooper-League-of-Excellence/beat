@@ -5,7 +5,7 @@ import interp::*;
 
 #include "builtin.ela";
 
-main :: fn() {
+fn main() {
   mut alloc := Dyn_Allocator::new(&mut Tracking_Allocator.{});
   allocator := &mut alloc;
   *get_default_allocator() = *allocator;

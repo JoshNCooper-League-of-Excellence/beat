@@ -14,23 +14,23 @@ import fs::File;
 alias SourceLocation :: (String, u32, u32);
 
 impl SourceLocation {
-  to_string :: fn(self) -> String {
+  fn to_string(self) -> String {
     return format("%:%:%", self, FormatOptions::default());
   }
 }
 
-LexError :: struct {
+struct LexError {
   location: SourceLocation,
   message:  String,
 }
 
 impl LexError {
-  print :: fn(self) {
+  fn print(self) {
     printlnf("error at %:%:%\n%", (self.location.0, self.location.1, self.location.2, self.message));
   }
 }
 
-TType :: enum {
+enum TType {
   Eof,
 
   Add,
@@ -82,24 +82,26 @@ TType :: enum {
   None,
 }
 
-Token :: struct {
+struct Token {
   type: TType,
   value: Option!<String>,
   location: SourceLocation,
 }
 
-Lexer :: struct {
+struct Lexer {
   input: String,
   location: SourceLocation,
-  buffer: Token[],
+  buffer: List!<Token>,
   position: u32,
 
   keywords: Map!<str, TType>,
+  operators: Map!<str, TType>,
+  
   allocator: *mut Dyn_Allocator,
 }
 
 impl Lexer {
-  new :: fn(allocator: *mut Dyn_Allocator, path: String) -> #self {
+  fn new(allocator: *mut Dyn_Allocator, path: String) -> Self {
     mut keywords: Map!<str, TType>;
 
     keywords.insert("none", TType::None);
@@ -107,7 +109,7 @@ impl Lexer {
     keywords.insert("if", TType::If);
     keywords.insert("else", TType::Else);
 
-    keywords.insert("fn", TType::Fn);
+    keywords.insert("fn", Fn TType);
     
     keywords.insert("var", TType::Var);
 
@@ -121,16 +123,40 @@ impl Lexer {
     keywords.insert("true", TType::True);
     keywords.insert("false", TType::False);
 
+    mut operators: Map!<str, TType>;
+
+    operators.insert("+", TType::Add);
+    operators.insert("-", TType::Sub);
+    operators.insert("*", TType::Mul);
+    operators.insert("/", TType::Div);
+    operators.insert("!", TType::Not);
+    operators.insert(",", TType::Comma);
+    operators.insert(".", TType::Dot);
+    operators.insert("(", TType::OpenParen);
+    operators.insert(")", TType::CloseParen);
+    operators.insert("{", TType::OpenCurly);
+    operators.insert("}", TType::CloseCurly);
+    operators.insert("[", TType::OpenBracket);
+    operators.insert("]", TType::CloseBracket);
+    operators.insert(";", TType::Semi);
+    operators.insert("<", TType::LT);
+    operators.insert(">", TType::GT);
+    operators.insert("<=", TType::LTE);
+    operators.insert(">=", TType::GTE);
+    operators.insert("==", TType::EQ);
+    operators.insert("!=", TType::NEQ);
+
     return .{
       input: File::read_all(path.as_str()).unwrap(),
       location: (path, 0, 0),
       keywords: keywords,
+      operators: operators,
       allocator: allocator,
     };
     
   }
 
-  advance :: fn(*mut self, new_line: bool) {
+  fn advance(*mut self, new_line: bool) {
     if new_line {
       self.location.1++;
       self.location.2 = 1;
@@ -140,12 +166,12 @@ impl Lexer {
     self.position++;
   }
 
-  get_next_char :: fn(*mut self, ch: *mut u8) {
+  fn get_next_char(*mut self, ch: *mut u8) {
     self.advance(false);
     *ch = self.input[self.position];
   }
 
-  get_token :: fn(*mut self) -> Result!<Token, LexError> {
+  fn get_token(*mut self) -> Result!<Token, LexError> {
     alias Result :: Result!<Token, LexError>;
     mut token: Token;
 
@@ -262,7 +288,6 @@ impl Lexer {
           '-' => TType::Sub,
           '/' => TType::Div,
           '*' => TType::Mul,
-          '=' => TType::Assign,
           '!' => TType::Not,
           ',' => TType::Comma,
           '.' => TType::Dot,
@@ -316,7 +341,7 @@ impl Lexer {
 }
 
 impl Lexer {
-  fill_buffer :: fn(*mut self) {
+  fn fill_buffer(*mut self) {
     while self.buffer.length < 8 {
       token := self.get_token();
       if token.is_err() {
@@ -326,21 +351,21 @@ impl Lexer {
     }
   }
 
-  eat :: fn(*mut self) -> Token {
+  fn eat(*mut self) -> Token {
     if self.buffer.length == 0 {
       self.fill_buffer();
     }
     return self.buffer.pop_front();
   }
 
-  peek :: fn(*mut self) -> Token {
+  fn peek(*mut self) -> Token {
     if self.buffer.length == 0 {
       self.fill_buffer();
     }
     return self.buffer[0];
   }
 
-  expect :: fn(*mut self, expected: TType) -> Token {
+  fn expect(*mut self, expected: TType) -> Token {
     token := self.eat();
 
     if token.type != expected {
@@ -349,6 +374,7 @@ impl Lexer {
         message: format("Expected token type: %, but got: %", (expected, token.type), FormatOptions::default()),
       };
       error.print();
+      exit(1);
     }
     return token;
   }

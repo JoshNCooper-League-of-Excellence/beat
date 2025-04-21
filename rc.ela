@@ -1,4 +1,4 @@
-Rc :: struct!<T> {
+struct Rc!<T> {
   ptr: *mut T,
   rc: *mut u64,
   allocator: *mut Dyn_Allocator,
@@ -6,8 +6,8 @@ Rc :: struct!<T> {
 
 impl!<T> Rc!<T> {
   // this hack to aleviate annoyances.
-  deinit :: fn(*const self) {
-    mut_self := self as *mut #self;
+  fn deinit(*const self) {
+    mut_self := self as *mut Self;
     *mut_self.rc -= 1;
     if *mut_self.rc <= 0 {
       mut_self.allocator.free(mut_self.ptr);
@@ -17,8 +17,8 @@ impl!<T> Rc!<T> {
 }
 
 impl!<T> Rc!<T> {
-  clone :: fn(*const self) -> #self {
-    mut_self := self as *mut #self;
+  fn clone(*const self) -> Self {
+    mut_self := self as *mut Self;
     *mut_self.rc += 1;
     return .{
       ptr: mut_self.ptr,
@@ -29,7 +29,7 @@ impl!<T> Rc!<T> {
 }
 
 impl!<T> Rc!<T> {
-  new :: fn(value: T) -> #self {
+  fn new(value: T) -> Self {
     allocator := get_default_allocator();
     return .{
       ptr:  allocator.new_ptr(value),
@@ -38,7 +38,7 @@ impl!<T> Rc!<T> {
     }
   }
 
-  empty :: fn() -> #self {
+  fn empty() -> Self {
     return .{
       ptr: null,
       rc:  null,
@@ -51,7 +51,7 @@ impl!<T> Rc!<T> {
     this allows the compiler to dereference it, and this allows us
     to assign via this pointer, instead of always just getting a value.
   */
-  deref :: fn(self) -> *mut T {
+  fn deref(self) -> *mut T {
     return self.ptr;
   }
 }

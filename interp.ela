@@ -1,29 +1,29 @@
 import parser::*;
 
-Interp :: struct {
+struct Interp {
   scope: *mut Scope,
 }
 
-ControlFlow :: enum {
+enum ControlFlow {
   None,
   Continue,
   Break,
   Return,
 }
 
-StatementResult :: struct {
+struct StatementResult {
   control_flow: ControlFlow,
   value: Option!<Rc!<Value>>,
 }
 
 impl Interp {
-  enter_scope :: fn(*mut self) -> *mut Scope {
+  fn enter_scope(*mut self) -> *mut Scope {
     old_scope := self.scope;
     mut scope := self.scope.create_child();
     self.scope = scope;
     return old_scope;
   }
-  release_scope :: fn(*mut self, scope: *mut Scope) {
+  fn release_scope(*mut self, scope: *mut Scope) {
     for key, value in self.scope.symbols {
       key.deinit();
       value.deinit();
@@ -34,7 +34,7 @@ impl Interp {
 }
 
 impl Interp {
-  visit_if :: fn(*mut self, node: *mut Node) -> StatementResult {
+  fn visit_if(*mut self, node: *mut Node) -> StatementResult {
     condition := self.visit_expression(node.if_node.condition);
     if condition.ptr.is_truthy() {
       condition.deinit();
@@ -50,7 +50,7 @@ impl Interp {
     };
   }
 
-  visit_else :: fn(*mut self, node: *mut Node) -> StatementResult {
+  fn visit_else(*mut self, node: *mut Node) -> StatementResult {
     if node.else_node.if_node.is_some() {
       return self.visit_if(node.else_node.if_node.unwrap());
     } else if node.else_node.block.is_some() {
@@ -62,7 +62,7 @@ impl Interp {
     };
   }
 
-  visit_while :: fn(*mut self, node: *mut Node) -> StatementResult {
+  fn visit_while(*mut self, node: *mut Node) -> StatementResult {
     while_node := &mut node.while_node;
 
     // TODO: this should be IN the while loop.
@@ -100,7 +100,7 @@ impl Interp {
     };
   }
 
-  visit_for :: fn(*mut self, node: *mut Node) -> StatementResult {
+  fn visit_for(*mut self, node: *mut Node) -> StatementResult {
     target := self.visit_expression(node.for_node.target);
     if target.ptr.tag != ValueTag::Array && target.ptr.tag != ValueTag::String {
       target.deinit();
@@ -185,7 +185,7 @@ impl Interp {
     };
   }
 
-  visit_binary :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+  fn visit_binary(*mut self, node: *mut Node) -> Rc!<Value> {
     left := self.visit_expression(node.binary.left);
     left.clone();
     right := self.visit_expression(node.binary.right);
@@ -213,7 +213,7 @@ impl Interp {
     return result;
   }
 
-  visit_unary :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+  fn visit_unary(*mut self, node: *mut Node) -> Rc!<Value> {
     operand := self.visit_expression(node.unary.operand);
     result := switch node.unary.operator {
       TType::Not => Rc!<Value>::new(Value.{
@@ -237,7 +237,7 @@ impl Interp {
     return result;
   }
 
-  visit_call :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+  fn visit_call(*mut self, node: *mut Node) -> Rc!<Value> {
     function := self.visit_expression(node.call.callee);
     mut args: List!<Rc!<Value>>;
     for arg in node.call.arguments {
@@ -258,7 +258,7 @@ impl Interp {
     return result;
   }
 
-  visit_member_access :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+  fn visit_member_access(*mut self, node: *mut Node) -> Rc!<Value> {
     object := self.visit_expression(node.member_access.base);
     defer object.deinit();
 
@@ -278,7 +278,7 @@ impl Interp {
     return result;
   }
 
-  visit_subscript :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+  fn visit_subscript(*mut self, node: *mut Node) -> Rc!<Value> {
     array := self.visit_expression(node.subscript.base);
     defer array.deinit();
 
@@ -299,7 +299,7 @@ impl Interp {
     return array.ptr.array[idx].clone();
   }
 
-  visit_object_literal :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+  fn visit_object_literal(*mut self, node: *mut Node) -> Rc!<Value> {
     mut object: Map!<String, Rc!<Value>>;
 
     for key, value_node in node.object_literal.key_values {
@@ -313,7 +313,7 @@ impl Interp {
     });
   }
 
-  visit_array_literal :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+  fn visit_array_literal(*mut self, node: *mut Node) -> Rc!<Value> {
     mut array: List!<Rc!<Value>> = .{
       length: 0,
       capacity: 0,
@@ -332,7 +332,7 @@ impl Interp {
     });
   }
 
-  visit_block :: fn(*mut self, node: *mut Node) -> StatementResult {
+  fn visit_block(*mut self, node: *mut Node) -> StatementResult {
     block := &mut node.block;
 
     old_scope := self.enter_scope();
@@ -356,7 +356,7 @@ impl Interp {
     };
   }
 
-  visit_variable :: fn(*mut self, node: *mut Node) -> StatementResult {
+  fn visit_variable(*mut self, node: *mut Node) -> StatementResult {
     variable_name := node.variable.name;
 
     if node.variable.value.is_some() {
@@ -371,7 +371,7 @@ impl Interp {
     };
   }
 
-  visit_function :: fn(*mut self, function: *mut Function, args: List!<Rc!<Value>>) -> Rc!<Value> {
+  fn visit_function(*mut self, function: *mut Function, args: List!<Rc!<Value>>) -> Rc!<Value> {
     old_scope := self.enter_scope();
 
     defer {
@@ -396,7 +396,7 @@ impl Interp {
     }
   }
 
-  visit_function_header :: fn(*mut self, node: *mut Node) {
+  fn visit_function_header(*mut self, node: *mut Node) {
     funcy := &mut node.function;
     self.scope.insert(funcy.name, Rc!<Value>::new(Value.{
       tag: ValueTag::Function,
@@ -404,7 +404,7 @@ impl Interp {
     }));
   }
 
-  visit_expression :: fn(*mut self, node: *mut Node) -> Rc!<Value> {
+  fn visit_expression(*mut self, node: *mut Node) -> Rc!<Value> {
     switch node.tag {
       NodeTag::Lambda: {
         function: *mut Function = get_default_allocator().new_ptr(Function.{});
@@ -470,7 +470,7 @@ impl Interp {
     return Value::None();
   }
 
-  visit_statement :: fn(*mut self, node: *mut Node) -> StatementResult {
+  fn visit_statement(*mut self, node: *mut Node) -> StatementResult {
     if node.tag == NodeTag::Boolean ||
        node.tag ==  NodeTag::Number ||
        node.tag ==  NodeTag::String ||
@@ -534,7 +534,7 @@ impl Interp {
     return .{};
   }
 
-  run :: fn(*mut self, root: *mut Node) {
+  fn run(*mut self, root: *mut Node) {
     mut visited_nodes: List!<*mut Node>;
     
     for node in root.block.statements {
